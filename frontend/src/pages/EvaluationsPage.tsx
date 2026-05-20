@@ -3,6 +3,7 @@
  * Stranica za pokretanje i praćenje evaluacija
  */
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Container,
@@ -34,6 +35,7 @@ import {
   Card,
   CardContent,
   Grid,
+  Checkbox,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -42,6 +44,7 @@ import {
   Visibility as ViewIcon,
   Assessment as AssessmentIcon,
   Refresh as RefreshIcon,
+  Compare as CompareIcon,
 } from '@mui/icons-material';
 import {
   getEvaluations,
@@ -61,6 +64,7 @@ import { collectionsApi } from '../api/collections';
 import type { Collection } from '../types/api';
 
 const EvaluationsPage: React.FC = () => {
+  const navigate = useNavigate();
   const [evaluations, setEvaluations] = useState<Evaluation[]>([]);
   const [collections, setCollections] = useState<Collection[]>([]);
   const [testExamples, setTestExamples] = useState<TestExample[]>([]);
@@ -73,6 +77,9 @@ const EvaluationsPage: React.FC = () => {
   const [statsDialogOpen, setStatsDialogOpen] = useState(false);
   const [selectedEvaluation, setSelectedEvaluation] = useState<Evaluation | null>(null);
   const [statistics, setStatistics] = useState<EvaluationStatistics | null>(null);
+  
+  // Compare states
+  const [selectedForCompare, setSelectedForCompare] = useState<number[]>([]);
   
   // Form states
   const [createForm, setCreateForm] = useState<EvaluationCreate>({
@@ -225,6 +232,27 @@ const EvaluationsPage: React.FC = () => {
     return value !== undefined && value !== null ? `${value.toFixed(1)}%` : 'N/A';
   };
 
+  const handleCompareCheckbox = (evaluationId: number) => {
+    setSelectedForCompare(prev => {
+      if (prev.includes(evaluationId)) {
+        return prev.filter(id => id !== evaluationId);
+      } else if (prev.length < 2) {
+        return [...prev, evaluationId];
+      } else {
+        // Replace first selected with new one
+        return [prev[1], evaluationId];
+      }
+    });
+  };
+
+  const handleCompare = () => {
+    if (selectedForCompare.length === 2) {
+      navigate(`/evaluations/compare/${selectedForCompare[0]}/${selectedForCompare[1]}`);
+    }
+  };
+
+  const canCompare = selectedForCompare.length === 2;
+
   if (loading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
@@ -242,6 +270,26 @@ const EvaluationsPage: React.FC = () => {
         </Typography>
         
         <Stack direction="row" spacing={2}>
+          {selectedForCompare.length > 0 && (
+            <Button
+              variant="outlined"
+              color="secondary"
+              onClick={() => setSelectedForCompare([])}
+            >
+              Poništi selekciju ({selectedForCompare.length})
+            </Button>
+          )}
+          
+          <Button
+            variant="contained"
+            color="secondary"
+            startIcon={<CompareIcon />}
+            onClick={handleCompare}
+            disabled={!canCompare}
+          >
+            Uporedi {selectedForCompare.length > 0 ? `(${selectedForCompare.length}/2)` : ''}
+          </Button>
+          
           <Button
             variant="outlined"
             startIcon={<RefreshIcon />}
@@ -272,6 +320,11 @@ const EvaluationsPage: React.FC = () => {
         <Table>
           <TableHead>
             <TableRow>
+              <TableCell padding="checkbox">
+                <Tooltip title="Izaberite 2 evaluacije za poređenje">
+                  <CompareIcon color="action" />
+                </Tooltip>
+              </TableCell>
               <TableCell>ID</TableCell>
               <TableCell>Naziv</TableCell>
               <TableCell>Status</TableCell>
@@ -286,7 +339,20 @@ const EvaluationsPage: React.FC = () => {
           </TableHead>
           <TableBody>
             {evaluations.map((evaluation) => (
-              <TableRow key={evaluation.id}>
+              <TableRow
+                key={evaluation.id}
+                selected={selectedForCompare.includes(evaluation.id)}
+              >
+                <TableCell padding="checkbox">
+                  <Checkbox
+                    checked={selectedForCompare.includes(evaluation.id)}
+                    onChange={() => handleCompareCheckbox(evaluation.id)}
+                    disabled={
+                      evaluation.status !== 'completed' ||
+                      (selectedForCompare.length >= 2 && !selectedForCompare.includes(evaluation.id))
+                    }
+                  />
+                </TableCell>
                 <TableCell>{evaluation.id}</TableCell>
                 <TableCell>
                   <Typography variant="body2" fontWeight="medium">

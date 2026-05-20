@@ -18,6 +18,8 @@ import PDFDetailPage from './pages/PDFDetailPage';
 import ChatPage from './pages/ChatPage';
 import TestExamplesPage from './pages/TestExamplesPage';
 import EvaluationsPage from './pages/EvaluationsPage';
+import EvaluationConfigPage from './pages/EvaluationConfigPage';
+import EvaluationComparePage from './pages/EvaluationComparePage';
 
 // Create Query Client
 const queryClient = new QueryClient({
@@ -48,6 +50,8 @@ function App() {
                   <Route path="/chat" element={<ChatPage />} />
                   <Route path="/test-examples" element={<TestExamplesPage />} />
                   <Route path="/evaluations" element={<EvaluationsPage />} />
+                  <Route path="/evaluations/config" element={<EvaluationConfigPage />} />
+                  <Route path="/evaluations/compare/:id1/:id2" element={<EvaluationComparePage />} />
                 </Routes>
               </Layout>
             </BrowserRouter>
