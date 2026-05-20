@@ -3,6 +3,8 @@ Evaluation Service
 Business logika za evaluaciju test primera
 """
 import logging
+import time
+import json
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 from sqlalchemy.orm import Session
@@ -28,7 +30,9 @@ class EvaluationService:
         self,
         name: str,
         description: Optional[str] = None,
-        test_example_ids: Optional[List[int]] = None
+        test_example_ids: Optional[List[int]] = None,
+        collection_id: Optional[int] = None,
+        config_snapshot: Optional[Dict[str, Any]] = None
     ) -> Evaluation:
         """
         Kreira novu evaluaciju
@@ -37,6 +41,8 @@ class EvaluationService:
             name: Naziv evaluacije
             description: Opis evaluacije
             test_example_ids: Lista ID-jeva test primera (None = svi aktivni)
+            collection_id: ID kolekcije za evaluaciju
+            config_snapshot: JSON snapshot RAG konfiguracije
             
         Returns:
             Kreirana evaluacija
@@ -45,6 +51,8 @@ class EvaluationService:
             name=name,
             description=description,
             status="pending",
+            collection_id=collection_id,
+            config_snapshot=json.dumps(config_snapshot) if config_snapshot else None,
             created_at=datetime.utcnow()
         )
         
@@ -369,6 +377,219 @@ class EvaluationService:
             "max": max(values),
             "count": len(values)
         }
+    
+    async def create_with_config(
+        self,
+        name: str,
+        collection_id: int,
+        test_example_ids: List[int],
+        config: Dict[str, Any],
+        description: Optional[str] = None
+    ) -> Evaluation:
+        """
+        Kreira evaluaciju sa RAG config snapshot-om
+        
+        Args:
+            name: Naziv evaluacije
+            collection_id: ID kolekcije
+            test_example_ids: Lista ID-jeva test primera
+            config: RAG konfiguracija (pipeline parametri)
+            description: Opis evaluacije
+            
+        Returns:
+            Kreirana evaluacija
+        """
+        return await self.create_evaluation(
+            name=name,
+            description=description,
+            test_example_ids=test_example_ids,
+            collection_id=collection_id,
+            config_snapshot=config
+        )
+    
+    async def run_with_config(
+        self,
+        evaluation_id: int,
+        config: Optional[Dict[str, Any]] = None
+    ) -> Evaluation:
+        """
+        Pokreće evaluaciju sa timing tracking-om
+        
+        Args:
+            evaluation_id: ID evaluacije
+            config: RAG konfiguracija (opciono, ako nije u snapshot-u)
+            
+        Returns:
+            Ažurirana evaluacija sa performance metrikama
+        """
+        evaluation = self.get_evaluation(evaluation_id)
+        if not evaluation:
+            raise ValueError(f"Evaluation {evaluation_id} not found")
+        
+        # Ako config nije prosleđen, pokušaj iz snapshot-a
+        if not config and evaluation.config_snapshot:
+            config = json.loads(evaluation.config_snapshot)
+        
+        # TODO: Primeni config na RAG engine pre pokretanja
+        # Ovo zahteva refaktorisanje RAG engine-a da prihvata runtime config
+        
+        # Za sada, pokreni standardnu evaluaciju
+        evaluation_start = time.time()
+        result = await self.run_evaluation(
+            evaluation_id=evaluation_id,
+            collection_id=evaluation.collection_id
+        )
+        evaluation_end = time.time()
+        
+        # Izračunaj ukupno vreme
+        result.total_evaluation_time_seconds = evaluation_end - evaluation_start
+        
+        # Izračunaj prosečne performance metrike iz rezultata
+        results = self.get_evaluation_results(evaluation_id, limit=10000)
+        if results:
+            result.avg_query_processing_ms = self._calculate_avg_metric(results, 'query_processing_ms')
+            result.avg_search_ms = self._calculate_avg_metric(results, 'search_ms')
+            result.avg_reranking_ms = self._calculate_avg_metric(results, 'reranking_ms')
+            result.avg_llm_generation_ms = self._calculate_avg_metric(results, 'llm_generation_ms')
+            result.avg_total_latency_ms = self._calculate_avg_metric(results, 'total_latency_ms')
+        
+        self.db.commit()
+        self.db.refresh(result)
+        
+        logger.info(f"Evaluation {evaluation_id} completed with timing: {result.total_evaluation_time_seconds:.2f}s")
+        return result
+    
+    def compare_evaluations(
+        self,
+        evaluation_id_1: int,
+        evaluation_id_2: int
+    ) -> Dict[str, Any]:
+        """
+        Poredi dve evaluacije
+        
+        Args:
+            evaluation_id_1: ID prve evaluacije
+            evaluation_id_2: ID druge evaluacije
+            
+        Returns:
+            Dict sa poređenjem config-a, metrika i performance-a
+        """
+        eval1 = self.get_evaluation(evaluation_id_1)
+        eval2 = self.get_evaluation(evaluation_id_2)
+        
+        if not eval1 or not eval2:
+            raise ValueError("One or both evaluations not found")
+        
+        # Parse config snapshots
+        config1 = json.loads(eval1.config_snapshot) if eval1.config_snapshot else {}
+        config2 = json.loads(eval2.config_snapshot) if eval2.config_snapshot else {}
+        
+        # Config diff
+        config_diff = self._compare_configs(config1, config2)
+        
+        # Metrics comparison
+        metrics_comparison = {
+            "bleu_score": {
+                "eval1": eval1.avg_bleu_score,
+                "eval2": eval2.avg_bleu_score,
+                "diff": (eval2.avg_bleu_score - eval1.avg_bleu_score) if eval1.avg_bleu_score and eval2.avg_bleu_score else None,
+                "improvement_pct": ((eval2.avg_bleu_score - eval1.avg_bleu_score) / eval1.avg_bleu_score * 100) if eval1.avg_bleu_score and eval2.avg_bleu_score and eval1.avg_bleu_score > 0 else None
+            },
+            "rouge_l": {
+                "eval1": eval1.avg_rouge_l,
+                "eval2": eval2.avg_rouge_l,
+                "diff": (eval2.avg_rouge_l - eval1.avg_rouge_l) if eval1.avg_rouge_l and eval2.avg_rouge_l else None,
+                "improvement_pct": ((eval2.avg_rouge_l - eval1.avg_rouge_l) / eval1.avg_rouge_l * 100) if eval1.avg_rouge_l and eval2.avg_rouge_l and eval1.avg_rouge_l > 0 else None
+            },
+            "bert_score": {
+                "eval1": eval1.avg_bert_score,
+                "eval2": eval2.avg_bert_score,
+                "diff": (eval2.avg_bert_score - eval1.avg_bert_score) if eval1.avg_bert_score and eval2.avg_bert_score else None,
+                "improvement_pct": ((eval2.avg_bert_score - eval1.avg_bert_score) / eval1.avg_bert_score * 100) if eval1.avg_bert_score and eval2.avg_bert_score and eval1.avg_bert_score > 0 else None
+            },
+            "exact_match": {
+                "eval1": eval1.exact_match_percentage,
+                "eval2": eval2.exact_match_percentage,
+                "diff": (eval2.exact_match_percentage - eval1.exact_match_percentage) if eval1.exact_match_percentage and eval2.exact_match_percentage else None
+            }
+        }
+        
+        # Performance comparison
+        performance_comparison = {
+            "query_processing_ms": {
+                "eval1": eval1.avg_query_processing_ms,
+                "eval2": eval2.avg_query_processing_ms,
+                "diff": (eval2.avg_query_processing_ms - eval1.avg_query_processing_ms) if eval1.avg_query_processing_ms and eval2.avg_query_processing_ms else None
+            },
+            "search_ms": {
+                "eval1": eval1.avg_search_ms,
+                "eval2": eval2.avg_search_ms,
+                "diff": (eval2.avg_search_ms - eval1.avg_search_ms) if eval1.avg_search_ms and eval2.avg_search_ms else None
+            },
+            "reranking_ms": {
+                "eval1": eval1.avg_reranking_ms,
+                "eval2": eval2.avg_reranking_ms,
+                "diff": (eval2.avg_reranking_ms - eval1.avg_reranking_ms) if eval1.avg_reranking_ms and eval2.avg_reranking_ms else None
+            },
+            "llm_generation_ms": {
+                "eval1": eval1.avg_llm_generation_ms,
+                "eval2": eval2.avg_llm_generation_ms,
+                "diff": (eval2.avg_llm_generation_ms - eval1.avg_llm_generation_ms) if eval1.avg_llm_generation_ms and eval2.avg_llm_generation_ms else None
+            },
+            "total_latency_ms": {
+                "eval1": eval1.avg_total_latency_ms,
+                "eval2": eval2.avg_total_latency_ms,
+                "diff": (eval2.avg_total_latency_ms - eval1.avg_total_latency_ms) if eval1.avg_total_latency_ms and eval2.avg_total_latency_ms else None
+            },
+            "total_evaluation_time_seconds": {
+                "eval1": eval1.total_evaluation_time_seconds,
+                "eval2": eval2.total_evaluation_time_seconds,
+                "diff": (eval2.total_evaluation_time_seconds - eval1.total_evaluation_time_seconds) if eval1.total_evaluation_time_seconds and eval2.total_evaluation_time_seconds else None
+            }
+        }
+        
+        return {
+            "evaluation_1": {
+                "id": eval1.id,
+                "name": eval1.name,
+                "status": eval1.status,
+                "collection_id": eval1.collection_id
+            },
+            "evaluation_2": {
+                "id": eval2.id,
+                "name": eval2.name,
+                "status": eval2.status,
+                "collection_id": eval2.collection_id
+            },
+            "config_diff": config_diff,
+            "metrics_comparison": metrics_comparison,
+            "performance_comparison": performance_comparison
+        }
+    
+    def _compare_configs(self, config1: Dict[str, Any], config2: Dict[str, Any]) -> Dict[str, Any]:
+        """Poredi dva config objekta i vraća razlike"""
+        diff = {
+            "changed": {},
+            "added_in_2": {},
+            "removed_from_1": {}
+        }
+        
+        # Proveri sve ključeve iz config1
+        for key in config1:
+            if key not in config2:
+                diff["removed_from_1"][key] = config1[key]
+            elif config1[key] != config2[key]:
+                diff["changed"][key] = {
+                    "from": config1[key],
+                    "to": config2[key]
+                }
+        
+        # Proveri nove ključeve u config2
+        for key in config2:
+            if key not in config1:
+                diff["added_in_2"][key] = config2[key]
+        
+        return diff
 
 
 # Made with Bob

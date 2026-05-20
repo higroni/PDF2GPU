@@ -14,6 +14,7 @@ from backend.routers import collections_router, pdfs_router, search_router
 from backend.routers.chat import router as chat_router
 from backend.routers.test_examples import router as test_examples_router
 from backend.routers.evaluations import router as evaluations_router
+from backend.routers.models import router as models_router
 from backend.dependencies import get_rag_engine
 
 # Setup logging with ASCII encoding
@@ -67,6 +68,7 @@ app.include_router(search_router, prefix="/api")
 app.include_router(chat_router, prefix="/api")
 app.include_router(test_examples_router)
 app.include_router(evaluations_router)
+app.include_router(models_router)
 
 
 @app.get("/health")

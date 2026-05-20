@@ -31,8 +31,13 @@ class TestExampleResult(Base):
     exact_match = Column(Integer, nullable=False, default=0)  # 0 ili 1 (boolean kao int)
     word_overlap = Column(Float, nullable=True)
     
-    # Performance
-    execution_time_ms = Column(Integer, nullable=True)
+    # Performance breakdown (per pipeline phase)
+    query_processing_ms = Column(Float, nullable=True)
+    search_ms = Column(Float, nullable=True)
+    reranking_ms = Column(Float, nullable=True)
+    llm_generation_ms = Column(Float, nullable=True)
+    total_latency_ms = Column(Float, nullable=True)
+    execution_time_ms = Column(Integer, nullable=True)  # Legacy field, kept for compatibility
     
     # Context
     context_used = Column(Text, nullable=True)  # JSON string sa sources

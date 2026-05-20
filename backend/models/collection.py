@@ -26,6 +26,7 @@ class Collection(Base):
     pdfs = relationship("PDF", back_populates="collection", cascade="all, delete-orphan")
     test_examples = relationship("TestExample", back_populates="collection", cascade="all, delete-orphan")
     session_logs = relationship("SessionLog", back_populates="collection", cascade="all, delete-orphan")
+    evaluations = relationship("Evaluation", back_populates="collection", cascade="all, delete-orphan")
     
     def __repr__(self):
         return f"<Collection(id={self.id}, name='{self.name}', active={self.is_active})>"

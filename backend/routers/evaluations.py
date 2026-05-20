@@ -319,5 +319,130 @@ async def delete_evaluation(
         logger.error(f"Error deleting evaluation: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+# New FAZA 9 endpoints
+
+class EvaluationWithConfigCreate(BaseModel):
+    """Schema za kreiranje evaluacije sa config-om"""
+    name: str = Field(..., min_length=1, max_length=200)
+    description: Optional[str] = None
+    collection_id: int
+    test_example_ids: List[int]
+    config: dict  # RAG pipeline configuration
+
+
+class EvaluationRunWithConfig(BaseModel):
+    """Schema za pokretanje evaluacije sa config-om"""
+    config: Optional[dict] = None  # Opciono, ako nije u snapshot-u
+
+
+@router.post("/with-config", response_model=EvaluationResponse)
+async def create_evaluation_with_config(
+    data: EvaluationWithConfigCreate,
+    db: Session = Depends(get_db)
+):
+    """
+    Kreira evaluaciju sa RAG config snapshot-om
+    """
+    try:
+        service = EvaluationService(db)
+        evaluation = await service.create_with_config(
+            name=data.name,
+            collection_id=data.collection_id,
+            test_example_ids=data.test_example_ids,
+            config=data.config,
+            description=data.description
+        )
+        
+        return EvaluationResponse(
+            id=evaluation.id,
+            name=evaluation.name,
+            description=evaluation.description,
+            status=evaluation.status,
+            created_at=evaluation.created_at.isoformat(),
+            started_at=None,
+            completed_at=None,
+            total_examples=None,
+            completed_examples=None,
+            avg_bleu_score=None,
+            avg_rouge_1=None,
+            avg_rouge_2=None,
+            avg_rouge_l=None,
+            avg_bert_score=None,
+            exact_match_percentage=None
+        )
+    except Exception as e:
+        logger.error(f"Error creating evaluation with config: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/{evaluation_id}/run-with-config", response_model=EvaluationResponse)
+async def run_evaluation_with_config(
+    evaluation_id: int,
+    data: EvaluationRunWithConfig,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
+    """
+    Pokreće evaluaciju sa timing tracking-om (u pozadini)
+    """
+    try:
+        service = EvaluationService(db)
+        
+        # Proveri da li evaluacija postoji
+        evaluation = service.get_evaluation(evaluation_id)
+        if not evaluation:
+            raise HTTPException(status_code=404, detail="Evaluation not found")
+        
+        # Pokreni evaluaciju u pozadini
+        background_tasks.add_task(
+            service.run_with_config,
+            evaluation_id=evaluation_id,
+            config=data.config
+        )
+        
+        # Vrati trenutni status
+        return EvaluationResponse(
+            id=evaluation.id,
+            name=evaluation.name,
+            description=evaluation.description,
+            status="running",
+            created_at=evaluation.created_at.isoformat(),
+            started_at=None,
+            completed_at=None,
+            total_examples=None,
+            completed_examples=None,
+            avg_bleu_score=None,
+            avg_rouge_1=None,
+            avg_rouge_2=None,
+            avg_rouge_l=None,
+            avg_bert_score=None,
+            exact_match_percentage=None
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error running evaluation with config: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/compare/{evaluation_id_1}/{evaluation_id_2}")
+async def compare_evaluations(
+    evaluation_id_1: int,
+    evaluation_id_2: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Poredi dve evaluacije (config, metrike, performance)
+    """
+    try:
+        service = EvaluationService(db)
+        comparison = service.compare_evaluations(evaluation_id_1, evaluation_id_2)
+        return comparison
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error comparing evaluations: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 # Made with Bob
