@@ -25,7 +25,7 @@ export interface InstallResponse {
  * Get available LLM models from Ollama
  */
 export const getLLMModels = async (): Promise<ModelInfo[]> => {
-  const response = await apiClient.get<ModelInfo[]>('/models/llm');
+  const response = await apiClient.get<ModelInfo[]>('/api/models/llm');
   return response.data;
 };
 
@@ -33,7 +33,7 @@ export const getLLMModels = async (): Promise<ModelInfo[]> => {
  * Get available embedding models
  */
 export const getEmbeddingModels = async (): Promise<ModelInfo[]> => {
-  const response = await apiClient.get<ModelInfo[]>('/models/embeddings');
+  const response = await apiClient.get<ModelInfo[]>('/api/models/embeddings');
   return response.data;
 };
 
@@ -41,7 +41,7 @@ export const getEmbeddingModels = async (): Promise<ModelInfo[]> => {
  * Get available reranker models
  */
 export const getRerankerModels = async (): Promise<ModelInfo[]> => {
-  const response = await apiClient.get<ModelInfo[]>('/models/rerankers');
+  const response = await apiClient.get<ModelInfo[]>('/api/models/rerankers');
   return response.data;
 };
 
@@ -53,7 +53,7 @@ export const installModel = async (
   modelName: string
 ): Promise<InstallResponse> => {
   const response = await apiClient.post<InstallResponse>(
-    `/models/install/${modelType}/${encodeURIComponent(modelName)}`
+    `/api/models/install/${modelType}/${encodeURIComponent(modelName)}`
   );
   return response.data;
 };

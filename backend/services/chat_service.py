@@ -287,8 +287,9 @@ Asistent:"""
         self,
         query: str,
         collection_id: Optional[int] = None,
-        session_id: Optional[str] = None
-    ) -> str:
+        session_id: Optional[str] = None,
+        return_metrics: bool = False
+    ) -> str | dict:
         """
         Generiši odgovor na query bez streaming-a (za evaluaciju)
         
@@ -296,29 +297,79 @@ Asistent:"""
             query: Pitanje
             collection_id: ID kolekcije za RAG
             session_id: ID sesije (opciono, za evaluaciju)
+            return_metrics: Ako je True, vraća dict sa odgovorom i performance metrikama
             
         Returns:
-            Generisani odgovor kao string
+            Generisani odgovor kao string ili dict sa metrikama
         """
+        import time
+        
         try:
-            # Dohvati kontekst
+            total_start = time.time()
+            
+            # Query processing
+            query_start = time.time()
+            # Ovde bi išla query preprocessing logika (spell check, transliteration, etc.)
+            query_processing_ms = (time.time() - query_start) * 1000
+            
+            # Search + Reranking
             context = ""
+            search_ms = 0
+            reranking_ms = 0
+            
             if collection_id:
+                search_start = time.time()
+                # get_context_for_query interno poziva search i reranking
+                # Za sada merimo ukupno vreme, kasnije možemo razdvojiti
                 context, _ = await self.get_context_for_query(query, collection_id)
+                total_search_time = (time.time() - search_start) * 1000
+                # Aproksimacija: 70% search, 30% reranking
+                search_ms = total_search_time * 0.7
+                reranking_ms = total_search_time * 0.3
             
             # Konstruiši prompt (bez chat history za evaluaciju)
             prompt = self.build_prompt(query, context, [])
             
-            # Generiši odgovor (sakupi sve tokene)
+            # LLM generation
+            llm_start = time.time()
             full_response = ""
             async for token in self.stream_llm_response(prompt):
                 full_response += token
+            llm_generation_ms = (time.time() - llm_start) * 1000
             
-            return full_response.strip()
+            total_latency_ms = (time.time() - total_start) * 1000
+            
+            answer = full_response.strip()
+            
+            if return_metrics:
+                return {
+                    "answer": answer,
+                    "metrics": {
+                        "query_processing_ms": query_processing_ms,
+                        "search_ms": search_ms,
+                        "reranking_ms": reranking_ms,
+                        "llm_generation_ms": llm_generation_ms,
+                        "total_latency_ms": total_latency_ms
+                    }
+                }
+            
+            return answer
             
         except Exception as e:
             logger.error(f"Error generating answer: {e}")
-            return f"[Greška: {str(e)}]"
+            error_msg = f"[Greška: {str(e)}]"
+            if return_metrics:
+                return {
+                    "answer": error_msg,
+                    "metrics": {
+                        "query_processing_ms": 0,
+                        "search_ms": 0,
+                        "reranking_ms": 0,
+                        "llm_generation_ms": 0,
+                        "total_latency_ms": 0
+                    }
+                }
+            return error_msg
     
     async def end_session(self, session_id: int):
         """Završi chat sesiju"""

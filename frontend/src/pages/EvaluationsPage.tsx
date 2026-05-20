@@ -45,6 +45,7 @@ import {
   Assessment as AssessmentIcon,
   Refresh as RefreshIcon,
   Compare as CompareIcon,
+  Settings as SettingsIcon,
 } from '@mui/icons-material';
 import {
   getEvaluations,
@@ -194,10 +195,15 @@ const EvaluationsPage: React.FC = () => {
     }
   };
 
-  const openRunDialog = (evaluation: Evaluation) => {
+  const openRunDialog = async (evaluation: Evaluation) => {
     setSelectedEvaluation(evaluation);
-    resetRunForm();
-    setRunDialogOpen(true);
+    try {
+      await runEvaluation(evaluation.id, {});
+      startPolling(evaluation.id);
+      loadData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to run evaluation');
+    }
   };
 
   const resetCreateForm = () => {
@@ -300,10 +306,10 @@ const EvaluationsPage: React.FC = () => {
           
           <Button
             variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => setCreateDialogOpen(true)}
+            startIcon={<SettingsIcon />}
+            onClick={() => navigate('/evaluations/config')}
           >
-            Nova Evaluacija
+            Nova Konfiguracija
           </Button>
         </Stack>
       </Box>

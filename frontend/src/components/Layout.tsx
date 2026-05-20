@@ -174,7 +174,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       >
         <Container maxWidth="lg">
           <Typography variant="body2" color="text.secondary" align="center">
-            PDF2GPU © 2024 - RAG System za procesiranje pravnih dokumenata
+            PDF2GPU © 2026 Branko Tadić - RAG System za procesiranje pravnih dokumenata
           </Typography>
         </Container>
       </Box>

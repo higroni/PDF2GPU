@@ -13,7 +13,11 @@ import {
   TextField,
   Tooltip,
   IconButton,
-  Collapse
+  Collapse,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel
 } from '@mui/material';
 import { Info, ExpandMore, ExpandLess } from '@mui/icons-material';
 import ModelSelector from './ModelSelector';
@@ -21,15 +25,18 @@ import ModelSelector from './ModelSelector';
 export interface ConfigParam {
   name: string;
   label: string;
-  type: 'checkbox' | 'slider' | 'text' | 'number' | 'model';
+  type: 'checkbox' | 'slider' | 'text' | 'number' | 'model' | 'select';
   value: any;
   tooltip?: string;
   min?: number;
   max?: number;
   step?: number;
   modelType?: 'llm' | 'embeddings' | 'rerankers';
+  options?: Array<{ value: string; label: string }>;
   disabled?: boolean;
   required?: boolean;
+  multiline?: boolean;
+  rows?: number;
 }
 
 interface ConfigSectionProps {
@@ -121,6 +128,8 @@ const ConfigSection: React.FC<ConfigSectionProps> = ({
             onChange={(e) => onChange(param.name, param.type === 'number' ? Number(e.target.value) : e.target.value)}
             disabled={param.disabled}
             required={param.required}
+            multiline={param.multiline}
+            rows={param.rows}
             InputProps={{
               endAdornment: param.tooltip && (
                 <Tooltip title={param.tooltip} arrow>
@@ -131,6 +140,30 @@ const ConfigSection: React.FC<ConfigSectionProps> = ({
               )
             }}
           />
+        )}
+
+        {param.type === 'select' && param.options && (
+          <FormControl fullWidth>
+            <InputLabel>{param.label}</InputLabel>
+            <Select
+              value={param.value}
+              onChange={(e) => onChange(param.name, e.target.value)}
+              label={param.label}
+              disabled={param.disabled}
+              required={param.required}
+            >
+              {param.options.map((option) => (
+                <MenuItem key={option.value} value={option.value}>
+                  {option.label}
+                </MenuItem>
+              ))}
+            </Select>
+            {param.tooltip && (
+              <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
+                {param.tooltip}
+              </Typography>
+            )}
+          </FormControl>
         )}
 
         {param.type === 'model' && param.modelType && (

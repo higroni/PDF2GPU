@@ -2,7 +2,8 @@
  * EvaluationConfigPage
  * Page for creating evaluations with RAG pipeline configuration
  */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Container,
   Box,
@@ -13,10 +14,17 @@ import {
   Stepper,
   Step,
   StepLabel,
-  Alert
+  Alert,
+  CircularProgress,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem
 } from '@mui/material';
-import { Save, PlayArrow } from '@mui/icons-material';
+import { Save, PlayArrow, Close } from '@mui/icons-material';
 import ConfigSection, { ConfigParam } from '../components/ConfigSection';
+import { collectionsApi } from '../api/collections';
+import type { Collection } from '../types/api';
 
 interface RAGConfig {
   pdf_processing: {
@@ -53,21 +61,42 @@ interface RAGConfig {
     model: string;
     temperature: number;
     max_tokens: number;
+    system_prompt: string;
   };
 }
 
 const EvaluationConfigPage: React.FC = () => {
+  const navigate = useNavigate();
   const [activeStep, setActiveStep] = useState(0);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [collectionId, setCollectionId] = useState<number | null>(null);
   const [testExampleIds, setTestExampleIds] = useState<number[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [collections, setCollections] = useState<Collection[]>([]);
+  const [loadingCollections, setLoadingCollections] = useState(true);
+
+  useEffect(() => {
+    loadCollections();
+  }, []);
+
+  const loadCollections = async () => {
+    try {
+      setLoadingCollections(true);
+      const data = await collectionsApi.getAll();
+      setCollections(data);
+    } catch (err) {
+      setError('Greška pri učitavanju kolekcija');
+    } finally {
+      setLoadingCollections(false);
+    }
+  };
   
   const [config, setConfig] = useState<RAGConfig>({
     pdf_processing: {
       use_transliteration: true,
-      use_spell_check: false
+      use_spell_check: true
     },
     chunking: {
       strategy: 'semantic',
@@ -84,7 +113,7 @@ const EvaluationConfigPage: React.FC = () => {
     },
     query_processing: {
       use_transliteration: true,
-      use_spell_check: false
+      use_spell_check: true
     },
     search: {
       top_k: 10,
@@ -98,19 +127,20 @@ const EvaluationConfigPage: React.FC = () => {
     llm: {
       model: 'llama3.2:latest',
       temperature: 0.7,
-      max_tokens: 2048
+      max_tokens: 2048,
+      system_prompt: 'Ti si AI asistent specijalizovan za odgovaranje na pitanja na osnovu dostavljenih dokumenata. Odgovaraj precizno, jasno i na srpskom jeziku.'
     }
   });
 
   const steps = [
-    'Basic Info',
-    'PDF Processing',
-    'Chunking',
+    'Osnovne Informacije',
+    'Obrada PDF-a',
+    'Segmentacija',
     'Embeddings',
-    'Vector Storage',
-    'Query Processing',
-    'Search',
-    'Reranking',
+    'Vektorska Baza',
+    'Obrada Upita',
+    'Pretraga',
+    'Rerankiranje',
     'LLM'
   ];
 
@@ -125,19 +155,68 @@ const EvaluationConfigPage: React.FC = () => {
   };
 
   const handleNext = () => {
-    setActiveStep(prev => Math.min(prev + 1, steps.length - 1));
+    setActiveStep(prev => {
+      const nextStep = Math.min(prev + 1, steps.length - 1);
+      
+      // Kada prelazimo sa koraka 0 na korak 1, postavi collection_name na evaluation name
+      if (prev === 0 && nextStep === 1 && name.trim()) {
+        setConfig(prevConfig => ({
+          ...prevConfig,
+          vector_storage: {
+            ...prevConfig.vector_storage,
+            collection_name: name.trim()
+          }
+        }));
+      }
+      
+      return nextStep;
+    });
   };
 
   const handleBack = () => {
     setActiveStep(prev => Math.max(prev - 1, 0));
   };
 
-  const handleSave = async () => {
+  const handleSave = async (runImmediately: boolean = false) => {
     try {
-      // TODO: Implement API call to create evaluation with config
-      console.log('Saving evaluation:', { name, description, collectionId, testExampleIds, config });
+      setLoading(true);
+      setError(null);
+
+      // Validacija
+      if (!name.trim()) {
+        setError('Naziv evaluacije je obavezan');
+        return;
+      }
+      if (!collectionId) {
+        setError('Kolekcija je obavezna');
+        return;
+      }
+
+      // Kreiraj evaluaciju sa konfiguracijom
+      const { createEvaluationWithConfig, runEvaluationWithConfig } = await import('../api/evaluations');
+      
+      const evaluation = await createEvaluationWithConfig({
+        name: name.trim(),
+        description: description?.trim(),
+        collection_id: collectionId,
+        test_example_ids: testExampleIds.length > 0 ? testExampleIds : [],
+        config: config
+      });
+
+      // Ako je "Create & Run", pokreni odmah
+      if (runImmediately) {
+        await runEvaluationWithConfig(evaluation.id, {
+          test_example_ids: testExampleIds.length > 0 ? testExampleIds : undefined,
+          collection_id: collectionId
+        });
+      }
+
+      // Navigiraj nazad na evaluations page
+      navigate('/evaluations');
     } catch (err) {
-      setError('Failed to save evaluation');
+      setError(err instanceof Error ? err.message : 'Greška pri čuvanju evaluacije');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -148,50 +227,79 @@ const EvaluationConfigPage: React.FC = () => {
           <Box>
             <TextField
               fullWidth
-              label="Evaluation Name"
+              label="Naziv Evaluacije"
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
               sx={{ mb: 2 }}
+              helperText="Unesite jedinstveni naziv za ovu evaluaciju"
             />
             <TextField
               fullWidth
-              label="Description"
+              label="Opis"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               multiline
               rows={3}
               sx={{ mb: 2 }}
+              helperText="Opcioni opis evaluacije"
             />
-            {/* TODO: Add Collection selector */}
-            {/* TODO: Add Test Examples selector */}
           </Box>
         );
 
       case 1: // PDF Processing
         return (
-          <ConfigSection
-            title="PDF Processing"
-            description="Configure how PDFs are processed"
-            params={[
-              {
-                name: 'use_transliteration',
-                label: 'Use Transliteration',
-                type: 'checkbox',
-                value: config.pdf_processing.use_transliteration,
-                tooltip: 'Convert Cyrillic to Latin characters'
-              },
-              {
-                name: 'use_spell_check',
-                label: 'Use Spell Check',
-                type: 'checkbox',
-                value: config.pdf_processing.use_spell_check,
-                tooltip: 'Enable spell checking during processing'
-              }
-            ]}
-            onChange={(param, value) => handleConfigChange('pdf_processing', param, value)}
-            collapsible={false}
-          />
+          <Box>
+            <FormControl fullWidth required sx={{ mb: 3 }}>
+              <InputLabel>PDF Kolekcija</InputLabel>
+              <Select
+                value={collectionId || ''}
+                onChange={(e) => setCollectionId(e.target.value as number)}
+                label="PDF Kolekcija"
+                disabled={loadingCollections}
+              >
+                {loadingCollections ? (
+                  <MenuItem disabled>
+                    <CircularProgress size={20} sx={{ mr: 1 }} />
+                    Učitavanje...
+                  </MenuItem>
+                ) : collections.length === 0 ? (
+                  <MenuItem disabled>Nema dostupnih kolekcija</MenuItem>
+                ) : (
+                  collections.map((collection) => (
+                    <MenuItem key={collection.id} value={collection.id}>
+                      {collection.name} ({collection.pdf_count} PDF-ova)
+                    </MenuItem>
+                  ))
+                )}
+              </Select>
+              <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
+                Izaberite kolekciju PDF dokumenata koja će biti corpus znanja za evaluaciju
+              </Typography>
+            </FormControl>
+            <ConfigSection
+              title="Obrada PDF-a"
+              description="Konfigurišite kako se PDF dokumenti obrađuju"
+              params={[
+                {
+                  name: 'use_transliteration',
+                  label: 'Koristi Transliteraciju',
+                  type: 'checkbox',
+                  value: config.pdf_processing.use_transliteration,
+                  tooltip: 'Konvertuj ćirilicu u latinicu'
+                },
+                {
+                  name: 'use_spell_check',
+                  label: 'Koristi Proveru Pravopisa',
+                  type: 'checkbox',
+                  value: config.pdf_processing.use_spell_check,
+                  tooltip: 'Omogući proveru pravopisa tokom obrade'
+                }
+              ]}
+              onChange={(param, value) => handleConfigChange('pdf_processing', param, value)}
+              collapsible={false}
+            />
+          </Box>
         );
 
       case 2: // Chunking
@@ -278,9 +386,14 @@ const EvaluationConfigPage: React.FC = () => {
               {
                 name: 'distance_metric',
                 label: 'Distance Metric',
-                type: 'text',
+                type: 'select',
                 value: config.vector_storage.distance_metric,
-                tooltip: 'Distance metric (cosine, euclidean, dot)'
+                options: [
+                  { value: 'cosine', label: 'Cosine' },
+                  { value: 'euclidean', label: 'Euclidean' },
+                  { value: 'dot', label: 'Dot Product' }
+                ],
+                tooltip: 'Distance metric for vector similarity'
               }
             ]}
             onChange={(param, value) => handleConfigChange('vector_storage', param, value)}
@@ -388,8 +501,8 @@ const EvaluationConfigPage: React.FC = () => {
       case 8: // LLM
         return (
           <ConfigSection
-            title="LLM Configuration"
-            description="Configure language model settings"
+            title="LLM Konfiguracija"
+            description="Konfigurišite podešavanja jezičkog modela"
             params={[
               {
                 name: 'model',
@@ -397,28 +510,37 @@ const EvaluationConfigPage: React.FC = () => {
                 type: 'model',
                 modelType: 'llm',
                 value: config.llm.model,
-                tooltip: 'Language model for answer generation',
+                tooltip: 'Jezički model za generisanje odgovora',
                 required: true
               },
               {
                 name: 'temperature',
-                label: 'Temperature',
+                label: 'Temperatura',
                 type: 'slider',
                 value: config.llm.temperature,
                 min: 0,
                 max: 2,
                 step: 0.1,
-                tooltip: 'Sampling temperature (higher = more creative)'
+                tooltip: 'Temperatura uzorkovanja (veća = kreativniji odgovori)'
               },
               {
                 name: 'max_tokens',
-                label: 'Max Tokens',
+                label: 'Maksimalan Broj Tokena',
                 type: 'slider',
                 value: config.llm.max_tokens,
                 min: 256,
                 max: 4096,
                 step: 256,
-                tooltip: 'Maximum number of tokens to generate'
+                tooltip: 'Maksimalan broj tokena za generisanje'
+              },
+              {
+                name: 'system_prompt',
+                label: 'Sistemski Prompt',
+                type: 'text',
+                value: config.llm.system_prompt,
+                multiline: true,
+                rows: 4,
+                tooltip: 'Uputstvo koje će biti poslato modelu kao sistemska poruka'
               }
             ]}
             onChange={(param, value) => handleConfigChange('llm', param, value)}
@@ -434,12 +556,23 @@ const EvaluationConfigPage: React.FC = () => {
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
       <Paper elevation={3} sx={{ p: 3 }}>
-        <Typography variant="h4" gutterBottom>
-          Create Evaluation with Configuration
-        </Typography>
-        <Typography variant="body2" color="text.secondary" paragraph>
-          Configure RAG pipeline parameters for this evaluation
-        </Typography>
+        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+          <Box>
+            <Typography variant="h4" gutterBottom>
+              Kreiraj Evaluaciju sa Konfiguracijom
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Konfigurišite parametre RAG pipeline-a za ovu evaluaciju
+            </Typography>
+          </Box>
+          <Button
+            variant="outlined"
+            startIcon={<Close />}
+            onClick={() => navigate('/evaluations')}
+          >
+            Zatvori
+          </Button>
+        </Box>
 
         {error && (
           <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
@@ -455,11 +588,11 @@ const EvaluationConfigPage: React.FC = () => {
           ))}
         </Stepper>
 
-        <Box sx={{ minHeight: 400 }}>
+        <Box sx={{ minHeight: 250 }}>
           {renderStepContent()}
         </Box>
 
-        <Box display="flex" justifyContent="space-between" sx={{ mt: 3 }}>
+        <Box display="flex" justifyContent="space-between" sx={{ mt: 2 }}>
           <Button
             disabled={activeStep === 0}
             onClick={handleBack}
@@ -470,7 +603,8 @@ const EvaluationConfigPage: React.FC = () => {
             <Button
               variant="outlined"
               startIcon={<Save />}
-              onClick={handleSave}
+              onClick={() => handleSave(false)}
+              disabled={loading}
             >
               Save Draft
             </Button>
@@ -478,7 +612,8 @@ const EvaluationConfigPage: React.FC = () => {
               <Button
                 variant="contained"
                 startIcon={<PlayArrow />}
-                onClick={handleSave}
+                onClick={() => handleSave(true)}
+                disabled={loading}
               >
                 Create & Run
               </Button>

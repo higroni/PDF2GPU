@@ -68,23 +68,7 @@ app.include_router(search_router, prefix="/api")
 app.include_router(chat_router, prefix="/api")
 app.include_router(test_examples_router)
 app.include_router(evaluations_router)
-app.include_router(models_router)
-
-
-@app.get("/health")
-async def health_check():
-    """Health check endpoint"""
-    return {"status": "ok", "message": "PDF2GPU API is running"}
-
-
-@app.get("/")
-async def root():
-    """Root endpoint"""
-    return {
-        "message": "PDF2GPU API",
-        "version": "1.0.0",
-        "docs": "/docs"
-    }
+app.include_router(models_router, prefix="/api")
 
 
 @app.on_event("startup")

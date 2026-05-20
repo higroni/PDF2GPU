@@ -199,4 +199,33 @@ export const pollEvaluationStatus = async (
   };
 };
 
+/**
+ * Kreira evaluaciju sa RAG konfiguracijom
+ */
+export interface EvaluationWithConfig {
+  name: string;
+  description?: string;
+  collection_id: number;
+  test_example_ids?: number[];
+  config_snapshot: Record<string, any>;
+}
+
+export const createEvaluationWithConfig = async (
+  data: EvaluationWithConfig
+): Promise<Evaluation> => {
+  const response = await apiClient.post('/api/evaluations/with-config', data);
+  return response.data;
+};
+
+/**
+ * Pokreće evaluaciju sa RAG konfiguracijom i timing tracking-om
+ */
+export const runEvaluationWithConfig = async (
+  id: number,
+  data: EvaluationRun
+): Promise<Evaluation> => {
+  const response = await apiClient.post(`/api/evaluations/${id}/run-with-config`, data);
+  return response.data;
+};
+
 // Made with Bob

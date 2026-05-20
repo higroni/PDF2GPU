@@ -36,6 +36,7 @@ class CollectionResponse(BaseModel):
     description: Optional[str]
     is_active: bool
     created_at: str
+    pdf_count: int = 0
     
     class Config:
         from_attributes = True
@@ -90,7 +91,8 @@ def get_collections(
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
-    service: CollectionService = Depends(get_collection_service)
+    service: CollectionService = Depends(get_collection_service),
+    pdf_service: PDFService = Depends(get_pdf_service)
 ):
     """
     Dobija sve kolekcije.
@@ -105,7 +107,8 @@ def get_collections(
             name=c.name,  # type: ignore
             description=c.description,  # type: ignore
             is_active=c.is_active,  # type: ignore
-            created_at=c.created_at.isoformat()  # type: ignore
+            created_at=c.created_at.isoformat(),  # type: ignore
+            pdf_count=len(pdf_service.get_pdfs_by_collection(db=db, collection_id=c.id))
         )
         for c in collections
     ]
@@ -114,7 +117,8 @@ def get_collections(
 @router.get("/active", response_model=Optional[CollectionResponse])
 def get_active_collection(
     db: Session = Depends(get_db),
-    service: CollectionService = Depends(get_collection_service)
+    service: CollectionService = Depends(get_collection_service),
+    pdf_service: PDFService = Depends(get_pdf_service)
 ):
     """Dobija aktivnu kolekciju."""
     collection = service.get_active_collection(db=db)
@@ -126,7 +130,8 @@ def get_active_collection(
         name=collection.name,  # type: ignore
         description=collection.description,  # type: ignore
         is_active=collection.is_active,  # type: ignore
-        created_at=collection.created_at.isoformat()  # type: ignore
+        created_at=collection.created_at.isoformat(),  # type: ignore
+        pdf_count=len(pdf_service.get_pdfs_by_collection(db=db, collection_id=collection.id))
     )
 
 

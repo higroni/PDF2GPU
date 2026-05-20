@@ -8,7 +8,7 @@ import subprocess
 import json
 from pathlib import Path
 
-router = APIRouter(prefix="/api/models", tags=["models"])
+router = APIRouter(prefix="/models", tags=["models"])
 
 
 @router.get("/llm", response_model=List[Dict[str, Any]])
@@ -25,6 +25,8 @@ async def get_available_llm_models():
             ["ollama", "list"],
             capture_output=True,
             text=True,
+            encoding='utf-8',
+            errors='replace',
             timeout=10
         )
         
@@ -219,6 +221,8 @@ async def install_model(model_type: str, model_name: str):
             # Pokreni ollama pull
             result = subprocess.run(
                 ["ollama", "pull", model_name],
+                encoding='utf-8',
+                errors='replace',
                 capture_output=True,
                 text=True,
                 timeout=300  # 5 minuta timeout

@@ -182,15 +182,19 @@ class EvaluationService:
         """
         logger.info(f"Evaluating test example {test_example.id}: {test_example.question[:50]}...")
         
-        # Generiši odgovor koristeći ChatService
-        # Koristimo collection_id ako je prosleđen, inače None
-        generated_answer = await self.chat_service.generate_answer(
+        # Generiši odgovor koristeći ChatService sa performance metrikama
+        result_data = await self.chat_service.generate_answer(
             query=test_example.question,
             collection_id=collection_id,
-            session_id=f"eval_{evaluation_id}_{test_example.id}"
+            session_id=f"eval_{evaluation_id}_{test_example.id}",
+            return_metrics=True
         )
         
-        # Izračunaj metrike
+        # Ekstraktuj odgovor i metrike
+        generated_answer = result_data["answer"]
+        perf_metrics = result_data["metrics"]
+        
+        # Izračunaj metrike kvaliteta
         metrics = calculate_all_metrics(
             reference=test_example.expected_answer,
             hypothesis=generated_answer
@@ -207,7 +211,7 @@ class EvaluationService:
             hypothesis=generated_answer
         )
         
-        # Kreiraj rezultat
+        # Kreiraj rezultat sa performance metrikama
         result = TestExampleResult(
             evaluation_id=evaluation_id,
             test_example_id=test_example.id,
@@ -221,6 +225,11 @@ class EvaluationService:
             bert_score_f1=metrics.get('bert_score_f1'),
             exact_match=1 if exact_match else 0,
             word_overlap=word_overlap,
+            query_processing_ms=perf_metrics.get('query_processing_ms'),
+            search_ms=perf_metrics.get('search_ms'),
+            reranking_ms=perf_metrics.get('reranking_ms'),
+            llm_generation_ms=perf_metrics.get('llm_generation_ms'),
+            total_latency_ms=perf_metrics.get('total_latency_ms'),
             execution_time_ms=None,
             created_at=datetime.utcnow()
         )
@@ -561,6 +570,8 @@ class EvaluationService:
                 "status": eval2.status,
                 "collection_id": eval2.collection_id
             },
+            "config_1": config1,
+            "config_2": config2,
             "config_diff": config_diff,
             "metrics_comparison": metrics_comparison,
             "performance_comparison": performance_comparison

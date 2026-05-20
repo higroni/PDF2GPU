@@ -3,7 +3,7 @@
  * Side-by-side comparison of two evaluations
  */
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import {
   Container,
   Box,
@@ -22,7 +22,8 @@ import {
   TableRow,
   Accordion,
   AccordionSummary,
-  AccordionDetails
+  AccordionDetails,
+  Button
 } from '@mui/material';
 import {
   ExpandMore,
@@ -30,7 +31,8 @@ import {
   TrendingDown,
   Remove,
   CheckCircle,
-  Error as ErrorIcon
+  Error as ErrorIcon,
+  ArrowBack
 } from '@mui/icons-material';
 import PerformanceBreakdown from '../components/PerformanceBreakdown';
 
@@ -47,6 +49,8 @@ interface ComparisonData {
     status: string;
     collection_id: number;
   };
+  config_1: Record<string, any>;
+  config_2: Record<string, any>;
   config_diff: {
     changed: Record<string, any>;
     added_in_2: Record<string, any>;
@@ -67,6 +71,7 @@ interface ComparisonData {
 
 const EvaluationComparePage: React.FC = () => {
   const { id1, id2 } = useParams<{ id1: string; id2: string }>();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [comparison, setComparison] = useState<ComparisonData | null>(null);
@@ -79,62 +84,63 @@ const EvaluationComparePage: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      // TODO: Implement API call
-      // const response = await fetch(`/api/evaluations/compare/${id1}/${id2}`);
-      // const data = await response.json();
-      // setComparison(data);
       
-      // Mock data for now
-      setComparison({
-        evaluation_1: {
-          id: parseInt(id1 || '1'),
-          name: 'Evaluation 1',
-          status: 'completed',
-          collection_id: 1
-        },
-        evaluation_2: {
-          id: parseInt(id2 || '2'),
-          name: 'Evaluation 2',
-          status: 'completed',
-          collection_id: 1
-        },
-        config_diff: {
-          changed: {
-            'llm.temperature': { from: 0.7, to: 0.5 },
-            'search.top_k': { from: 10, to: 15 }
-          },
-          added_in_2: {},
-          removed_from_1: {}
-        },
-        metrics_comparison: {
-          bleu_score: { eval1: 0.24, eval2: 0.28, diff: 0.04, improvement_pct: 16.67 },
-          rouge_l: { eval1: 0.45, eval2: 0.52, diff: 0.07, improvement_pct: 15.56 },
-          bert_score: { eval1: 0.89, eval2: 0.91, diff: 0.02, improvement_pct: 2.25 },
-          exact_match: { eval1: 4.1, eval2: 6.2, diff: 2.1, improvement_pct: null }
-        },
-        performance_comparison: {
-          query_processing_ms: { eval1: 50, eval2: 45, diff: -5 },
-          search_ms: { eval1: 120, eval2: 110, diff: -10 },
-          reranking_ms: { eval1: 80, eval2: 85, diff: 5 },
-          llm_generation_ms: { eval1: 2000, eval2: 1800, diff: -200 },
-          total_latency_ms: { eval1: 2250, eval2: 2040, diff: -210 }
-        }
-      });
+      const response = await fetch(`/api/evaluations/compare/${id1}/${id2}`);
+      if (!response.ok) {
+        throw new Error('Failed to load comparison');
+      }
+      const data = await response.json();
+      setComparison(data);
     } catch (err) {
-      setError('Failed to load comparison');
+      setError(err instanceof Error ? err.message : 'Greška pri učitavanju poređenja');
     } finally {
       setLoading(false);
     }
   };
 
-  const renderTrendIcon = (diff: number | null) => {
-    if (diff === null || diff === 0) return <Remove color="disabled" />;
+  // Flatten nested config object to dot notation
+  const flattenConfig = (obj: Record<string, any>, prefix = ''): Record<string, any> => {
+    const result: Record<string, any> = {};
+    
+    for (const key in obj) {
+      const fullKey = prefix ? `${prefix}.${key}` : key;
+      
+      if (obj[key] !== null && typeof obj[key] === 'object' && !Array.isArray(obj[key])) {
+        Object.assign(result, flattenConfig(obj[key], fullKey));
+      } else {
+        result[fullKey] = obj[key];
+      }
+    }
+    
+    return result;
+  };
+
+  // Get all config parameters with comparison
+  const getAllConfigParams = () => {
+    if (!comparison) return [];
+    
+    const flat1 = flattenConfig(comparison.config_1);
+    const flat2 = flattenConfig(comparison.config_2);
+    
+    // Get all unique keys
+    const allKeys = new Set([...Object.keys(flat1), ...Object.keys(flat2)]);
+    
+    return Array.from(allKeys).sort().map(key => ({
+      key,
+      value1: flat1[key] !== undefined ? flat1[key] : '-',
+      value2: flat2[key] !== undefined ? flat2[key] : '-',
+      isDifferent: JSON.stringify(flat1[key]) !== JSON.stringify(flat2[key])
+    }));
+  };
+
+  const renderTrendIcon = (diff: number | null | undefined) => {
+    if (diff === null || diff === undefined || diff === 0) return <Remove color="disabled" />;
     if (diff > 0) return <TrendingUp color="success" />;
     return <TrendingDown color="error" />;
   };
 
-  const renderImprovementChip = (improvement: number | null) => {
-    if (improvement === null) return null;
+  const renderImprovementChip = (improvement: number | null | undefined) => {
+    if (improvement === null || improvement === undefined) return null;
     const color = improvement > 0 ? 'success' : improvement < 0 ? 'error' : 'default';
     const icon = improvement > 0 ? <TrendingUp /> : improvement < 0 ? <TrendingDown /> : <Remove />;
     return (
@@ -147,8 +153,8 @@ const EvaluationComparePage: React.FC = () => {
     );
   };
 
-  const formatValue = (value: number | null): string => {
-    if (value === null) return 'N/A';
+  const formatValue = (value: number | null | undefined): string => {
+    if (value === null || value === undefined) return 'N/A';
     if (value < 1) return value.toFixed(3);
     if (value < 100) return value.toFixed(2);
     return value.toFixed(0);
@@ -159,7 +165,7 @@ const EvaluationComparePage: React.FC = () => {
       <Container maxWidth="lg" sx={{ py: 4, textAlign: 'center' }}>
         <CircularProgress />
         <Typography variant="body1" sx={{ mt: 2 }}>
-          Loading comparison...
+          Učitavanje poređenja...
         </Typography>
       </Container>
     );
@@ -168,19 +174,30 @@ const EvaluationComparePage: React.FC = () => {
   if (error || !comparison) {
     return (
       <Container maxWidth="lg" sx={{ py: 4 }}>
-        <Alert severity="error">{error || 'Failed to load comparison'}</Alert>
+        <Alert severity="error">{error || 'Greška pri učitavanju poređenja'}</Alert>
       </Container>
     );
   }
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
-      <Typography variant="h4" gutterBottom>
-        Evaluation Comparison
-      </Typography>
-      <Typography variant="body2" color="text.secondary" paragraph>
-        Comparing configurations, metrics, and performance
-      </Typography>
+      <Box display="flex" alignItems="center" gap={2} mb={3}>
+        <Button
+          startIcon={<ArrowBack />}
+          onClick={() => navigate('/evaluations')}
+          variant="outlined"
+        >
+          Nazad na Evaluacije
+        </Button>
+        <Box>
+          <Typography variant="h4">
+            Poređenje Evaluacija
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Poređenje konfiguracija, metrika i performansi
+          </Typography>
+        </Box>
+      </Box>
 
       {/* Evaluation Headers */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
@@ -206,80 +223,72 @@ const EvaluationComparePage: React.FC = () => {
         </Grid>
       </Grid>
 
-      {/* Config Diff */}
+      {/* Config Comparison - Show ALL parameters */}
       <Accordion defaultExpanded>
         <AccordionSummary expandIcon={<ExpandMore />}>
-          <Typography variant="h6">Configuration Differences</Typography>
+          <Typography variant="h6">Poređenje Konfiguracije</Typography>
         </AccordionSummary>
         <AccordionDetails>
-          {Object.keys(comparison.config_diff.changed).length === 0 &&
-           Object.keys(comparison.config_diff.added_in_2).length === 0 &&
-           Object.keys(comparison.config_diff.removed_from_1).length === 0 ? (
-            <Alert severity="info">No configuration differences</Alert>
-          ) : (
-            <TableContainer>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Parameter</TableCell>
-                    <TableCell>Evaluation 1</TableCell>
-                    <TableCell>Evaluation 2</TableCell>
-                    <TableCell>Change</TableCell>
+          <TableContainer>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Parametar</TableCell>
+                  <TableCell>{comparison.evaluation_1.name}</TableCell>
+                  <TableCell>{comparison.evaluation_2.name}</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {getAllConfigParams().map(({ key, value1, value2, isDifferent }) => (
+                  <TableRow
+                    key={key}
+                    sx={{
+                      bgcolor: isDifferent ? 'warning.light' : 'inherit',
+                      '&:hover': {
+                        bgcolor: isDifferent ? 'warning.main' : 'action.hover'
+                      }
+                    }}
+                  >
+                    <TableCell>
+                      <strong>{key}</strong>
+                      {isDifferent && (
+                        <Chip
+                          label="Različito"
+                          color="warning"
+                          size="small"
+                          sx={{ ml: 1 }}
+                        />
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {typeof value1 === 'object' ? JSON.stringify(value1) : String(value1)}
+                    </TableCell>
+                    <TableCell>
+                      {typeof value2 === 'object' ? JSON.stringify(value2) : String(value2)}
+                    </TableCell>
                   </TableRow>
-                </TableHead>
-                <TableBody>
-                  {Object.entries(comparison.config_diff.changed).map(([key, value]: [string, any]) => (
-                    <TableRow key={key}>
-                      <TableCell><strong>{key}</strong></TableCell>
-                      <TableCell>{JSON.stringify(value.from)}</TableCell>
-                      <TableCell>{JSON.stringify(value.to)}</TableCell>
-                      <TableCell>
-                        <Chip label="Changed" color="warning" size="small" />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {Object.entries(comparison.config_diff.added_in_2).map(([key, value]) => (
-                    <TableRow key={key}>
-                      <TableCell><strong>{key}</strong></TableCell>
-                      <TableCell>-</TableCell>
-                      <TableCell>{JSON.stringify(value)}</TableCell>
-                      <TableCell>
-                        <Chip label="Added" color="success" size="small" />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {Object.entries(comparison.config_diff.removed_from_1).map(([key, value]) => (
-                    <TableRow key={key}>
-                      <TableCell><strong>{key}</strong></TableCell>
-                      <TableCell>{JSON.stringify(value)}</TableCell>
-                      <TableCell>-</TableCell>
-                      <TableCell>
-                        <Chip label="Removed" color="error" size="small" />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          )}
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
         </AccordionDetails>
       </Accordion>
 
       {/* Metrics Comparison */}
       <Accordion defaultExpanded sx={{ mt: 2 }}>
         <AccordionSummary expandIcon={<ExpandMore />}>
-          <Typography variant="h6">Metrics Comparison</Typography>
+          <Typography variant="h6">Poređenje Metrika</Typography>
         </AccordionSummary>
         <AccordionDetails>
           <TableContainer>
             <Table>
               <TableHead>
                 <TableRow>
-                  <TableCell>Metric</TableCell>
-                  <TableCell align="right">Evaluation 1</TableCell>
-                  <TableCell align="right">Evaluation 2</TableCell>
-                  <TableCell align="right">Difference</TableCell>
-                  <TableCell align="right">Improvement</TableCell>
+                  <TableCell>Metrika</TableCell>
+                  <TableCell align="right">{comparison.evaluation_1.name}</TableCell>
+                  <TableCell align="right">{comparison.evaluation_2.name}</TableCell>
+                  <TableCell align="right">Razlika</TableCell>
+                  <TableCell align="right">Poboljšanje</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -308,13 +317,13 @@ const EvaluationComparePage: React.FC = () => {
       {/* Performance Comparison */}
       <Accordion defaultExpanded sx={{ mt: 2 }}>
         <AccordionSummary expandIcon={<ExpandMore />}>
-          <Typography variant="h6">Performance Comparison</Typography>
+          <Typography variant="h6">Poređenje Performansi</Typography>
         </AccordionSummary>
         <AccordionDetails>
           <Grid container spacing={3}>
             <Grid item xs={12} md={6}>
               <Typography variant="subtitle1" gutterBottom>
-                Evaluation 1
+                {comparison.evaluation_1.name}
               </Typography>
               <PerformanceBreakdown
                 metrics={{
@@ -330,7 +339,7 @@ const EvaluationComparePage: React.FC = () => {
             </Grid>
             <Grid item xs={12} md={6}>
               <Typography variant="subtitle1" gutterBottom>
-                Evaluation 2
+                {comparison.evaluation_2.name}
               </Typography>
               <PerformanceBreakdown
                 metrics={{
@@ -349,14 +358,14 @@ const EvaluationComparePage: React.FC = () => {
           <Divider sx={{ my: 3 }} />
 
           <Typography variant="subtitle2" gutterBottom>
-            Performance Differences
+            Razlike u Performansama
           </Typography>
           <TableContainer>
             <Table size="small">
               <TableHead>
                 <TableRow>
-                  <TableCell>Phase</TableCell>
-                  <TableCell align="right">Difference (ms)</TableCell>
+                  <TableCell>Faza</TableCell>
+                  <TableCell align="right">Razlika (ms)</TableCell>
                   <TableCell align="right">Status</TableCell>
                 </TableRow>
               </TableHead>
@@ -376,7 +385,7 @@ const EvaluationComparePage: React.FC = () => {
                         {data.diff !== null && data.diff !== 0 && (
                           <Chip
                             icon={isFaster ? <CheckCircle /> : <ErrorIcon />}
-                            label={isFaster ? 'Faster' : 'Slower'}
+                            label={isFaster ? 'Brže' : 'Sporije'}
                             color={isFaster ? 'success' : 'error'}
                             size="small"
                           />
