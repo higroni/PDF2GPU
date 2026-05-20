@@ -25,7 +25,6 @@ class Collection(Base):
     # Relationships
     pdfs = relationship("PDF", back_populates="collection", cascade="all, delete-orphan")
     test_examples = relationship("TestExample", back_populates="collection", cascade="all, delete-orphan")
-    evaluations = relationship("Evaluation", back_populates="collection", cascade="all, delete-orphan")
     session_logs = relationship("SessionLog", back_populates="collection", cascade="all, delete-orphan")
     
     def __repr__(self):

@@ -283,6 +283,43 @@ Asistent:"""
             logger.error(f"Error generating response: {e}")
             yield {"type": "error", "content": str(e)}
     
+    async def generate_answer(
+        self,
+        query: str,
+        collection_id: Optional[int] = None,
+        session_id: Optional[str] = None
+    ) -> str:
+        """
+        Generiši odgovor na query bez streaming-a (za evaluaciju)
+        
+        Args:
+            query: Pitanje
+            collection_id: ID kolekcije za RAG
+            session_id: ID sesije (opciono, za evaluaciju)
+            
+        Returns:
+            Generisani odgovor kao string
+        """
+        try:
+            # Dohvati kontekst
+            context = ""
+            if collection_id:
+                context, _ = await self.get_context_for_query(query, collection_id)
+            
+            # Konstruiši prompt (bez chat history za evaluaciju)
+            prompt = self.build_prompt(query, context, [])
+            
+            # Generiši odgovor (sakupi sve tokene)
+            full_response = ""
+            async for token in self.stream_llm_response(prompt):
+                full_response += token
+            
+            return full_response.strip()
+            
+        except Exception as e:
+            logger.error(f"Error generating answer: {e}")
+            return f"[Greška: {str(e)}]"
+    
     async def end_session(self, session_id: int):
         """Završi chat sesiju"""
         session = self.db.query(SessionLog).filter(SessionLog.id == session_id).first()

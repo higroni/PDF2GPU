@@ -10,5 +10,7 @@ export { searchApi } from './search';
 export * from './collections';
 export * from './pdfs';
 export * from './search';
+export * from './testExamples';
+export * from './evaluations';
 
 // Made with Bob

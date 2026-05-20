@@ -1,0 +1,293 @@
+{
+  "collection_id": 1,
+  "test_examples": [
+    {
+      "question": "Koliki je neoporezivi iznos dohotka za 2025. godinu?",
+      "expected_answer": "Neoporezivi iznos dohotka za 2025. godinu je 5.439.096 dinara.",
+      "category": "neoporezivi_iznos",
+      "difficulty": "easy"
+    },
+    {
+      "question": "Kolika je prosečna godišnja zarada po zaposlenom u Republici za 2025. godinu?",
+      "expected_answer": "Prosečna godišnja zarada po zaposlenom u Republici za 2025. godinu iznosi 1.813.032 dinara.",
+      "category": "prosecna_zarada",
+      "difficulty": "easy"
+    },
+    {
+      "question": "Ko su obveznici godišnjeg poreza na dohodak građana?",
+      "expected_answer": "Obveznicima godišnjeg poreza na dohodak građana su fizička lica koja su u kalendarskoj godini ostvarila dohodak veći od trostrukog iznosa prosečne godišnje zarade po zaposlenom isplaćene u Republici Srbiji u toj godini, prema podacima republičkog organa nadležnog za poslove statistike.",
+      "category": "obveznici",
+      "difficulty": "medium"
+    },
+    {
+      "question": "Kada se fizičko lice smatra rezidentom Republike Srbije?",
+      "expected_answer": "Fizičko lice se smatra rezidentom Republike Srbije kada: 1) na teritoriji Republike ima prebivalište ili centar poslovnih i životnih interesa, 2) na teritoriji Republike, neprekidno ili sa prekidima, boravi 183 ili više dana u periodu od 12 meseci koji počinje ili se završava u poreskoj godini, 3) je upućeno u drugu državu radi obavljanja poslova u diplomatskom ili konzularnom predstavništvu Republike.",
+      "category": "rezidentnost",
+      "difficulty": "medium"
+    },
+    {
+      "question": "Koji prihodi su predmet oporezivanja godišnjim porezom na dohodak građana?",
+      "expected_answer": "Prihodi koji su predmet oporezivanja su: 1) zarada, 2) oporezivi prihod od samostalne delatnosti, 3) oporezivi prihod od autorskih i srodnih prava i prava industrijske svojine, 4) oporezivi prihod od nepokretnosti, 5) oporezivi prihod od davanja u zakup pokretnih stvari, 6) oporezivi prihod sportista.",
+      "category": "prihodi",
+      "difficulty": "medium"
+    },
+    {
+      "question": "Šta čini dohodak za oporezivanje?",
+      "expected_answer": "Dohodak za oporezivanje čine prihodi koje fizičko lice ostvari u kalendarskoj godini umanjeni za porez na dohodak građana i doprinose za obavezno socijalno osiguranje plaćene na te prihode u Republici na teret lica koje ih je ostvarilo.",
+      "category": "dohodak",
+      "difficulty": "medium"
+    },
+    {
+      "question": "Kolika je najviša godišnja osnovica doprinosa za 2025. godinu?",
+      "expected_answer": "Najviša godišnja osnovica doprinosa za 2025. godinu iznosi 7.877.100 dinara.",
+      "category": "doprinosi",
+      "difficulty": "easy"
+    },
+    {
+      "question": "Da li fizička lica mlađa od 40 godina imaju dodatno umanjenje dohotka?",
+      "expected_answer": "Da, fizička lica koja su 31. decembara 2025. godine imale manje od navršenih 40 godina života imaju dodatno umanjenje dohotka za iznos od 5.439.096 dinara.",
+      "category": "mladi_od_40",
+      "difficulty": "easy"
+    },
+    {
+      "question": "Za koliki iznos se dodatno umanjuje dohodak za lica mlađa od 40 godina u 2025. godini?",
+      "expected_answer": "Dohodak za fizička lica mlađa od 40 godina se dodatno umanjuje za iznos od 5.439.096 dinara u 2025. godini.",
+      "category": "mladi_od_40",
+      "difficulty": "easy"
+    },
+    {
+      "question": "Šta je poreski kredit za ulaganje u alternativni investicioni fond?",
+      "expected_answer": "Poreski kredit za ulaganje u alternativni investicioni fond pruža obvezniku mogućnost da izvrši ulaganje u ovakav fond ili kupuje investicione jedinice takvog fonda, i tada dobije pravo na poreski kredit za godišnji porez na dohodak građana. Ovaj kredit se može koristiti najviše u iznosu od 50% ulaganja koje su izvršena tokom kalendarske godine.",
+      "category": "poreski_kredit",
+      "difficulty": "hard"
+    },
+    {
+      "question": "Koliki je maksimalni poreski kredit u odnosu na obračunatu poresku obavezu?",
+      "expected_answer": "Maksimalni poreski kredit ne može biti veći od 50% obračunate poreske obaveze po osnovu godišnjeg poreza na dohodak građana.",
+      "category": "poreski_kredit",
+      "difficulty": "medium"
+    },
+    {
+      "question": "Koliko dugo obveznik ne sme da otuđi akcije alternativnog investicionog fonda da ne bi izgubio pravo na poreski kredit?",
+      "expected_answer": "Obveznik ne bi trebalo da otuđi akcije ili udele u alternativnom investicionom fondu tokom kalendarske godine u kojoj je izvršio ulaganje i u sledeće dve kalendarske godine. U suprotnom, gubi pravo na poreski kredit po osnovu tog ulaganja.",
+      "category": "poreski_kredit",
+      "difficulty": "medium"
+    },
+    {
+      "question": "Koliki je lični odbitak za obveznika u 2025. godini?",
+      "expected_answer": "Lični odbitak za obveznika u 2025. godini iznosi 725.213 dinara. To je 40% od prosečne godišnje zarade po zaposlenom za tu godinu.",
+      "category": "licni_odbici",
+      "difficulty": "easy"
+    },
+    {
+      "question": "Koliki je lični odbitak za izdržavanog člana porodice u 2025. godini?",
+      "expected_answer": "Lični odbitak za izdržavanog člana porodice u 2025. godini iznosi 271.955 dinara.",
+      "category": "licni_odbici",
+      "difficulty": "easy"
+    },
+    {
+      "question": "Koliki je maksimalni iznos ličnih odbitaka u odnosu na dohodak za oporezivanje?",
+      "expected_answer": "Maksimalni iznos ličnih odbitaka ne može biti veći od 50% dohotka za oporezivanje.",
+      "category": "licni_odbici",
+      "difficulty": "medium"
+    },
+    {
+      "question": "Kolika je poreska stopa za oporezivi dohodak do šestostruke prosečne godišnje zarade?",
+      "expected_answer": "Poreska stopa za oporezivi dohodak do šestostruke prosečne godišnje zarade je 10%.",
+      "category": "poreska_stopa",
+      "difficulty": "easy"
+    },
+    {
+      "question": "Kolika je poreska stopa za oporezivi dohodak iznad šestostruke prosečne godišnje zarade?",
+      "expected_answer": "Poreska stopa za oporezivi dohodak iznad šestostruke prosečne godišnje zarade je 15%.",
+      "category": "poreska_stopa",
+      "difficulty": "easy"
+    },
+    {
+      "question": "Do kog iznosa oporezivog dohotka se primenjuje stopa od 10% u 2025. godini?",
+      "expected_answer": "U 2025. godini, za oporezivi dohodak do 10.878.192 dinara se primenjuje stopa godišnjeg poreza od 10%. Ako je dohodak veći od ovog iznosa, na iznos do 10.878.192 dinara se primenjuje stopa od 10%, a na iznos preko 10.878.192 dinara se primenjuje stopa godišnjeg poreza od 15%.",
+      "category": "poreska_stopa",
+      "difficulty": "medium"
+    },
+    {
+      "question": "Do kog datuma se podnosi poreska prijava za godišnji porez na dohodak građana?",
+      "expected_answer": "Poreska prijava za godišnji porez na dohodak građana se podnosi najkasnije do 15. maja godine koja sledi godini za koju se utvrđuje porez.",
+      "category": "rok_podnosenja",
+      "difficulty": "easy"
+    },
+    {
+      "question": "Do kog datuma Poreska uprava postavlja unapred popunjenu poresku prijavu na portal?",
+      "expected_answer": "Poreska uprava postavlja unapred popunjenu poresku prijavu na portal najkasnije do 1. aprila godine koja sledi godini za koju se utvrđuje godišnji porez na dohodak građana.",
+      "category": "rok_podnosenja",
+      "difficulty": "easy"
+    },
+    {
+      "question": "Na koji način se podnosi poreska prijava o obračunatom godišnjem porezu na dohodak građana?",
+      "expected_answer": "Poreska prijava o obračunatom godišnjem porezu na dohodak građana se podnosi isključivo u elektronskom obliku preko portala Poreske uprave, ePorezi. Podnositi je moguće korišćenjem Kvalifikovanog elektronskog sertifikata ili eID naloga/sertifikata u klaudu putem aplikacije ConsentID.",
+      "category": "nacin_podnosenja",
+      "difficulty": "medium"
+    },
+    {
+      "question": "Koji su načini pristupa portalu ePorezi za potpisivanje poreskih prijava?",
+      "expected_answer": "Načini pristupa portalu ePorezi su: 1) Korišćenjem Kvalifikovanog elektronskog sertifikata, 2) Korišćenjem eID naloga ili mobilne aplikacije ConsentID i sertifikata u klaudu, 3) Korišćenjem Kvalifikovanog elektronskog sertifikata zajedno sa aplikacijom SmartBox.",
+      "category": "pristup_portalu",
+      "difficulty": "medium"
+    },
+    {
+      "question": "Da li nerezident može sam da podnese poresku prijavu?",
+      "expected_answer": "Nerezidentni obveznik ne može sam da podnese poresku prijavu. On mora da to uradi kroz poreskog punomoćnika koji je određen u skladu sa Zakonom o poreskom postupku i poreskoj administraciji.",
+      "category": "nerezidenti",
+      "difficulty": "medium"
+    },
+    {
+      "question": "Ko nema obavezu da podnese poresku prijavu?",
+      "expected_answer": "Fizička lica kojima je dohodak za oporezivanje godišnjim porezom na dohodak građana 0 dinara nemaju obavezu da podnesu poresku prijavu PP GPDG.",
+      "category": "izuzetak_od_obaveze",
+      "difficulty": "medium"
+    },
+    {
+      "question": "Do kog datuma se plaća godišnji porez na dohodak građana?",
+      "expected_answer": "Godišnji porez na dohodak građana je dužan je da se plati najkasnije do 15. maja sledeće godine od one za koju se utvrđuje poreska obaveza.",
+      "category": "rok_placanja",
+      "difficulty": "easy"
+    },
+    {
+      "question": "Šta se dešava ako obveznik ne izmiri poresku obavezu u propisanom roku?",
+      "expected_answer": "Ako obveznik ne izmiri poresku obavezu do 15. maja godine koja sledi od utvrđivanja poreza, iznos obaveze se povećava za kamatu u skladu sa odredbama Zakona o poreskom postupku i poreskoj administraciji. Ukoliko obveznik dalje ne izmiri obavezu, Poreska uprava može podneti nadležnom prekršajnom sudu zahteve za pokretanje prekršajnog postupka.",
+      "category": "kamata",
+      "difficulty": "medium"
+    },
+    {
+      "question": "Koji obrazac se koristi za poresku prijavu o godišnjem porezu na dohodak građana?",
+      "expected_answer": "Obrazac koji se koristi za poresku prijavu o obračunatom godišnjem porezu na dohodak građana je Obrazac PP GPDG – Poreska Prijava o obračunatom godišnjem porezu na dohodak građana.",
+      "category": "obrazac",
+      "difficulty": "easy"
+    },
+    {
+      "question": "Od koje godine se godišnji porez na dohodak građana obračunava po sistemu samooporezivanja?",
+      "expected_answer": "Godišnji porez na dohodak građana se počevši od poreza koji se obračunava za 2022. godinu obračunava i plaća po sistemu samooporezivanja.",
+      "category": "samooporezivanје",
+      "difficulty": "easy"
+    },
+    {
+      "question": "Koliko dana mora fizičko lice da boravi na teritoriji Republike da bi bilo smatrano rezidentom?",
+      "expected_answer": "Fizičko lice se smatra rezidentom Republike Srbije ako na teritoriji Republike, neprekidno ili sa prekidima, boravi 183 ili više dana u periodu od 12 meseci.",
+      "category": "rezidentnost",
+      "difficulty": "easy"
+    },
+    {
+      "question": "Da li se prihodi ostvareni u drugoj državi oporezuju za rezidente Republike?",
+      "expected_answer": "Da, prihodi ostvareni i oporezovani u drugoj državi za obveznike koji su rezidenti Republike Srbije se mogu umanjiti za porez na dohodak građana isplaćen u toj drugoj državi. To znači da se ti prihodi, nakon isplate poreza u drugoj državi, oporezuju u Republici Srbiji, ali su umanjeni za već isplaćen porez tamo.",
+      "category": "poreski_kredit_strana_drzava",
+      "difficulty": "medium"
+    },
+    {
+      "question": "Kako se tretiraju prihodi rezidenta koji su oporezovani u drugoj državi?",
+      "expected_answer": "Prihodi rezidenta Republike Srbije koji su oporezovani u drugoj državi se umanjuju za porez plaćen u toj drugoj državi. Takvi prihodi pripadaju skupu oporezovih prihoda i umanjenja se odnose na obveznike koji su rezidenti Republike Srbije.",
+      "category": "poreski_kredit_strana_drzava",
+      "difficulty": "medium"
+    },
+    {
+      "question": "Šta se dešava sa povraćajem više plaćenih doprinosa u odnosu na dohodak?",
+      "expected_answer": "Iznos povraćaja više plaćenog doprinosa za obavezno socijalno osiguranje se uvećava godišnji zbir oporezivih prihoda. Ovaj iznos se dodaje dohodu koji se oporezuje godišnjim porezom na dohodak za 2025. godinu.",
+      "category": "povracaj_doprinosa",
+      "difficulty": "hard"
+    },
+    {
+      "question": "Šta je poreska osnovica za obračun godišnjeg poreza na dohodak građana?",
+      "expected_answer": "Osnovica za obračun godišnjeg poreza na dohodak građana je oporezivi dohodak. To znači da se od ukupnog dohotka uzima u obzir samo ono što je predmet oporezivanja prema propisima Zakona o porezu na dohodak građana.",
+      "category": "poreska_osnovica",
+      "difficulty": "medium"
+    },
+    {
+      "question": "Ako su dva ili više članova porodice obveznici godišnjeg poreza, ko može da ostvari odbitak za izdržavane članove?",
+      "expected_answer": "Ako su dva ili više članova porodice obveznici godišnjeg poreza na dohodak, odbitak za izdržavane članove porodice može da ostvari samo jedan obveznik.",
+      "category": "licni_odbici",
+      "difficulty": "medium"
+    },
+    {
+      "question": "U kom roku obveznik mora da obavesti poreski organ o gubitku prava na poreski kredit?",
+      "expected_answer": "Obveznik je dužan da obavesti nadležni poreski organ u roku od 30 dana od dana gubitka prava na poreski kredit.",
+      "category": "poreski_kredit",
+      "difficulty": "medium"
+    },
+    {
+      "question": "Šta obveznik mora da plati ako izgubi pravo na poreski kredit?",
+      "expected_answer": "Ako obveznik izgubi pravo na poreski kredit, dužan je u roku od 30 dana od datuma gubitka tog prava da obavesti nadležni poreski organ i plati poresku obavezu sa prethodno priznatim pravom na poreski kredit uz pripadajuću kamatu.",
+      "category": "poreski_kredit",
+      "difficulty": "hard"
+    },
+    {
+      "question": "Šta se dešava ako Poreska uprava ne postavi unapred popunjenu poresku prijavu?",
+      "expected_answer": "Ako Poreska uprava nije pripremila unapred popunjenu poresku prijavu, fizičkim licima koja su poreski obveznici za godišnji porez na dohodak je potrebno samostalno popuniti i podneti poresku prijavu preko portala Poreske uprave najkasnije do 15. maja svake godine.",
+      "category": "podnosenje_prijave",
+      "difficulty": "medium"
+    },
+    {
+      "question": "Šta se dešava ako obveznik ne podnese poresku prijavu do 15. maja?",
+      "expected_answer": "Ako obveznik ne podnese poresku prijavu do 15. maja, Poreska uprava će na njegovo ime podneti zahteve za pokretanje prekršajnog postupka.",
+      "category": "prekrsaj",
+      "difficulty": "medium"
+    },
+    {
+      "question": "Koji su kontakt brojevi Kontakt centra Poreske uprave?",
+      "expected_answer": "Kontakt brojevi Kontakt centra Poreske uprave su: 0700-700-007 i 011-6969-069.",
+      "category": "kontakt",
+      "difficulty": "easy"
+    },
+    {
+      "question": "Koja je internet adresa Poreske uprave?",
+      "expected_answer": "Internet adresa Poreske uprave je www.purs.gov.rs.",
+      "category": "kontakt",
+      "difficulty": "easy"
+    },
+    {
+      "question": "Koja je adresa portala ePorezi?",
+      "expected_answer": "Adresa portala ePorezi je https://eporezi.purs.gov.rs/.",
+      "category": "portal",
+      "difficulty": "easy"
+    },
+    {
+      "question": "Koja ovlašćena sertifikaciona tela izdaju kvalifikovane elektronske sertifikate?",
+      "expected_answer": "Ovlašćena sertifikaciona tela koja izdaju kvalifikovane elektronske sertifikate su: Privredna komora Srbije (www.pks.rs/ca/), Ministarstvo unutrašnjih poslova (http://ca.mup.gov.rs), PTT (www.ca.posta.rs), Halcom (http://www.halcom.rs), E-Smart Systems (http://qca.e-smartsys.com/).",
+      "category": "sertifikati",
+      "difficulty": "medium"
+    },
+    {
+      "question": "Može li obveznik da ovlasti drugo lice za podnošenje poreske prijave?",
+      "expected_answer": "Da, poreski obveznik može ovlaštenjem na elektronskom putu (preko PEP obrazca) ovlastiti drugo lice, koje mora biti rezident Republike Srbije i posedovati Kvalifikovani elektronski sertifikat, da za njega podnosi poresku prijavu.",
+      "category": "ovlascenje",
+      "difficulty": "medium"
+    },
+    {
+      "question": "Koji operativni sistemi su podržani za SmartBox aplikaciju?",
+      "expected_answer": "SmartBox aplikacija omogućava pristup portalu ePorezi sa računara koji koriste Windows, Linux (Ubuntu) ili macOS operativni sistem.",
+      "category": "smartbox",
+      "difficulty": "easy"
+    },
+    {
+      "question": "Kako se upisuju iznosi u poreskoj prijavi?",
+      "expected_answer": "Iznosi u poreskoj prijavi se upisuju u dinarima, bez decimala i bez tačke, zapete ili praznog polja između brojeva. Ako na nekom polju nisu uneti podaci o iznosu, tamo se upisuje 0 (nula). Ne može se iskazati negativan broj.",
+      "category": "popunjavanje_prijave",
+      "difficulty": "medium"
+    },
+    {
+      "question": "Šta obveznik treba da uradi ako prijava sadrži grešku?",
+      "expected_answer": "Ako prijava sadrži grešku koja za posledicu ima pogrešno utvrđenu visinu poreske obaveze, poreski obveznik mora podnijeti izmenjenu poresku prijavu u skladu sa članom 40. Zakona o porezu na dohodak i porezu na prvenstvo (ZPPPA).",
+      "category": "izmenjena_prijava",
+      "difficulty": "medium"
+    },
+    {
+      "question": "Koji je status poreske prijave nakon podnošenja?",
+      "expected_answer": "Nakon podnošenja poreske prijave, prijava dobija status 'Proknjižena'. Takođe, podnosilac prijave dobija podatke o nalogu za plaćanje i na ekranu će biti prikazan QR kod koji se može koristiti za plaćanje poreske obaveze.",
+      "category": "status_prijave",
+      "difficulty": "easy"
+    },
+    {
+      "question": "Kako se može platiti poreska obaveza nakon podnošenja prijave?",
+      "expected_answer": "Nakon što ste podnijeli poresku prijavu i ta prijava dobije status 'Proknjižena', dobićete informacije o nalogu za plaćanje. Na ekranu će biti prikazan QR kod koji se može koristiti za uplatu poreske obaveze. Poreska obaveza se može platiti kroz elektronski sistem ili preko tradicionalnih kanala poput banaka i drugih finansijskih institucija.",
+      "category": "placanje",
+      "difficulty": "medium"
+    }
+  ]
+}

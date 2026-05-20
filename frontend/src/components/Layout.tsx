@@ -27,6 +27,8 @@ import {
   Search as SearchIcon,
   Chat as ChatIcon,
   Description as PdfIcon,
+  Quiz as QuizIcon,
+  Assessment as AssessmentIcon,
 } from '@mui/icons-material';
 
 interface LayoutProps {
@@ -37,6 +39,8 @@ const navigationItems = [
   { path: '/collections', label: 'Kolekcije', icon: <CollectionsIcon /> },
   { path: '/search', label: 'Pretraga', icon: <SearchIcon /> },
   { path: '/chat', label: 'Chat', icon: <ChatIcon /> },
+  { path: '/test-examples', label: 'Test Primeri', icon: <QuizIcon /> },
+  { path: '/evaluations', label: 'Evaluacije', icon: <AssessmentIcon /> },
 ];
 
 export const Layout: React.FC<LayoutProps> = ({ children }) => {

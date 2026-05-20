@@ -16,6 +16,8 @@ import CollectionDetailPage from './pages/CollectionDetailPage';
 import SearchPage from './pages/SearchPage';
 import PDFDetailPage from './pages/PDFDetailPage';
 import ChatPage from './pages/ChatPage';
+import TestExamplesPage from './pages/TestExamplesPage';
+import EvaluationsPage from './pages/EvaluationsPage';
 
 // Create Query Client
 const queryClient = new QueryClient({
@@ -44,6 +46,8 @@ function App() {
                   <Route path="/search" element={<SearchPage />} />
                   <Route path="/pdfs/:id" element={<PDFDetailPage />} />
                   <Route path="/chat" element={<ChatPage />} />
+                  <Route path="/test-examples" element={<TestExamplesPage />} />
+                  <Route path="/evaluations" element={<EvaluationsPage />} />
                 </Routes>
               </Layout>
             </BrowserRouter>

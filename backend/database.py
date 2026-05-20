@@ -45,7 +45,7 @@ def init_db():
     """
     try:
         # Import svih modela da bi Base.metadata.create_all() radio
-        from backend.models import pdf, chat_message, test_example, feedback, evaluation, collection, settings_model, session_log
+        from backend.models import pdf, chat_message, test_example, test_example_result, feedback, evaluation, collection, settings_model, session_log
         
         # Kreiraj sve tabele
         Base.metadata.create_all(bind=engine)

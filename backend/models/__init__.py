@@ -4,6 +4,7 @@ Database Models Package
 from backend.models.pdf import PDF
 from backend.models.chat_message import ChatMessage
 from backend.models.test_example import TestExample
+from backend.models.test_example_result import TestExampleResult
 from backend.models.feedback import Feedback
 from backend.models.evaluation import Evaluation
 from backend.models.collection import Collection
@@ -14,6 +15,7 @@ __all__ = [
     "PDF",
     "ChatMessage",
     "TestExample",
+    "TestExampleResult",
     "Feedback",
     "Evaluation",
     "Collection",
