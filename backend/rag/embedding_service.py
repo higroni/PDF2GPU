@@ -9,6 +9,7 @@ import torch
 from sentence_transformers import SentenceTransformer
 import numpy as np
 import logging
+from .embedding_cache import get_global_cache, EmbeddingCache
 
 # Konfiguriši logger
 logger = logging.getLogger(__name__)
@@ -21,7 +22,10 @@ class EmbeddingService:
         self,
         model_name: str = "BAAI/bge-m3",
         device: Optional[str] = None,
-        batch_size: int = 32
+        batch_size: int = 32,
+        adaptive_batch: bool = True,
+        use_cache: bool = True,
+        cache_size: int = 10000
     ):
         """
         Inicijalizuje embedding servis.
@@ -30,9 +34,21 @@ class EmbeddingService:
             model_name: Naziv modela (default: BAAI/bge-m3)
             device: Device za izvršavanje ('cuda', 'cpu', ili None za auto)
             batch_size: Veličina batch-a za procesiranje
+            adaptive_batch: Automatski prilagodi batch size na osnovu GPU memorije
+            use_cache: Koristi embedding cache
+            cache_size: Maksimalan broj cached embeddings
         """
         self.model_name = model_name
         self.batch_size = batch_size
+        self.adaptive_batch = adaptive_batch
+        self.use_cache = use_cache
+        
+        # Initialize cache
+        if self.use_cache:
+            self.cache = get_global_cache(max_size=cache_size)
+            logger.info(f"Embedding cache enabled (max_size={cache_size})")
+        else:
+            self.cache = None
         
         # Automatski detektuj device ako nije specificiran
         if device is None:
@@ -63,12 +79,43 @@ class EmbeddingService:
         
         # Dobij dimenzionalnost embeddings-a
         self.embedding_dim = self.model.get_sentence_embedding_dimension()
-        print(f"Embedding dimenzija: {self.embedding_dim}")
+        logger.info(f"Embedding dimenzija: {self.embedding_dim}")
         
-        # Proveri GPU memoriju ako je dostupna
+        # Proveri GPU memoriju i prilagodi batch size ako je potrebno
         if self.device == "cuda":
             gpu_memory = torch.cuda.get_device_properties(0).total_memory / 1024**3
-            print(f"GPU memorija: {gpu_memory:.2f} GB")
+            logger.info(f"GPU memorija: {gpu_memory:.2f} GB")
+            
+            if self.adaptive_batch:
+                self.batch_size = self._calculate_optimal_batch_size(gpu_memory)
+                logger.info(f"Adaptive batch size: {self.batch_size}")
+        
+        logger.info(f"Final batch size: {self.batch_size}")
+    
+    def _calculate_optimal_batch_size(self, gpu_memory_gb: float) -> int:
+        """
+        Izračunava optimalni batch size na osnovu dostupne GPU memorije.
+        
+        Args:
+            gpu_memory_gb: Dostupna GPU memorija u GB
+            
+        Returns:
+            Optimalni batch size
+        """
+        # Heuristika: ~1GB po 32 batch-a za BGE-M3 model
+        # Ostavi 2GB za model i ostale operacije
+        available_memory = max(0, gpu_memory_gb - 2.0)
+        
+        if available_memory < 2:
+            return 32  # Minimum za male GPU-ove
+        elif available_memory < 4:
+            return 64
+        elif available_memory < 8:
+            return 128
+        elif available_memory < 12:
+            return 256
+        else:
+            return 512  # Maximum za velike GPU-ove (24GB+)
     
     def encode(
         self,
@@ -77,7 +124,7 @@ class EmbeddingService:
         normalize: bool = True
     ) -> np.ndarray:
         """
-        Generiše embeddings za listu tekstova.
+        Generiše embeddings za listu tekstova sa cache support.
         
         Args:
             texts: Lista tekstova za enkodiranje
@@ -90,20 +137,55 @@ class EmbeddingService:
         if not texts:
             return np.array([])
         
-        # Generiši embeddings
-        embeddings = self.model.encode(
-            texts,
+        # Ako cache nije omogućen, generiši direktno
+        if not self.use_cache or self.cache is None:
+            embeddings = self.model.encode(
+                texts,
+                batch_size=self.batch_size,
+                show_progress_bar=show_progress,
+                convert_to_numpy=True,
+                normalize_embeddings=normalize
+            )
+            return embeddings
+        
+        # Proveri cache
+        cached_embeddings, missing_indices = self.cache.get_batch(texts, self.model_name)
+        
+        # Ako su svi u cache-u, vrati ih
+        if not missing_indices:
+            logger.debug(f"Cache hit: {len(texts)}/{len(texts)} embeddings")
+            return np.array([e for e in cached_embeddings if e is not None])
+        
+        # Generiši samo missing embeddings
+        missing_texts = [texts[i] for i in missing_indices]
+        logger.debug(f"Cache miss: {len(missing_texts)}/{len(texts)} embeddings need generation")
+        
+        new_embeddings = self.model.encode(
+            missing_texts,
             batch_size=self.batch_size,
             show_progress_bar=show_progress,
             convert_to_numpy=True,
             normalize_embeddings=normalize
         )
         
-        return embeddings
+        # Cache novi embeddings (convert to list for cache)
+        self.cache.put_batch(missing_texts, self.model_name, list(new_embeddings))
+        
+        # Kombinuj cached i new embeddings
+        result = []
+        new_idx = 0
+        for i, cached in enumerate(cached_embeddings):
+            if cached is not None:
+                result.append(cached)
+            else:
+                result.append(new_embeddings[new_idx])
+                new_idx += 1
+        
+        return np.array(result)
     
     def encode_single(self, text: str, normalize: bool = True) -> np.ndarray:
         """
-        Generiše embedding za jedan tekst.
+        Generiše embedding za jedan tekst sa cache support.
         
         Args:
             text: Tekst za enkodiranje
@@ -112,11 +194,23 @@ class EmbeddingService:
         Returns:
             NumPy array sa embedding-om (shape: [embedding_dim])
         """
+        # Proveri cache
+        if self.use_cache and self.cache is not None:
+            cached = self.cache.get(text, self.model_name)
+            if cached is not None:
+                logger.debug("Cache hit for single embedding")
+                return cached
+        
+        # Generiši embedding
         embedding = self.model.encode(
             text,
             convert_to_numpy=True,
             normalize_embeddings=normalize
         )
+        
+        # Cache rezultat
+        if self.use_cache and self.cache is not None:
+            self.cache.put(text, self.model_name, embedding)
         
         return embedding
     
@@ -196,7 +290,7 @@ class EmbeddingService:
     
     def get_device_info(self) -> dict:
         """
-        Vraća informacije o device-u.
+        Vraća informacije o device-u i cache-u.
         
         Returns:
             Dict sa informacijama o device-u
@@ -205,7 +299,8 @@ class EmbeddingService:
             'device': self.device,
             'model_name': self.model_name,
             'embedding_dim': self.embedding_dim,
-            'batch_size': self.batch_size
+            'batch_size': self.batch_size,
+            'cache_enabled': self.use_cache
         }
         
         if self.device == "cuda":
@@ -215,6 +310,10 @@ class EmbeddingService:
             info['cuda_memory_total'] = torch.cuda.get_device_properties(0).total_memory / 1024**3
             info['cuda_memory_allocated'] = torch.cuda.memory_allocated(0) / 1024**3
             info['cuda_memory_reserved'] = torch.cuda.memory_reserved(0) / 1024**3
+        
+        # Add cache stats
+        if self.use_cache and self.cache is not None:
+            info['cache_stats'] = self.cache.get_stats()
         
         return info
     
@@ -237,7 +336,10 @@ class HybridEmbeddingService:
         self,
         dense_model: str = "BAAI/bge-m3",
         device: Optional[str] = None,
-        batch_size: int = 32
+        batch_size: int = 32,
+        adaptive_batch: bool = True,
+        use_cache: bool = True,
+        cache_size: int = 10000
     ):
         """
         Inicijalizuje hybrid embedding servis.
@@ -246,11 +348,17 @@ class HybridEmbeddingService:
             dense_model: Model za dense embeddings
             device: Device za izvršavanje
             batch_size: Veličina batch-a
+            adaptive_batch: Automatski prilagodi batch size
+            use_cache: Koristi embedding cache
+            cache_size: Maksimalan broj cached embeddings
         """
         self.dense_service = EmbeddingService(
             model_name=dense_model,
             device=device,
-            batch_size=batch_size
+            batch_size=batch_size,
+            adaptive_batch=adaptive_batch,
+            use_cache=use_cache,
+            cache_size=cache_size
         )
     
     def encode_dense(
