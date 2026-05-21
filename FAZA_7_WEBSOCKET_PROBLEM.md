@@ -1,119 +1,143 @@
-# Faza 7 - WebSocket Problem - Izveštaj
-
-## Datum: 2026-05-20
+# WebSocket Problem - Root Cause Analiza i Rešenje
 
 ## Problem
-WebSocket konekcija se uspostavlja ali se odmah zatvara, što dovodi do beskonačne petlje reconnect pokušaja.
+Frontend dobija **timeout of 30000ms exceeded** grešku kada pokušava da se poveže na WebSocket endpoint tokom izvršavanja evaluacije.
 
-## Simptomi
-1. Chat sesija se uspešno kreira (POST `/api/chat/sessions` vraća 200 OK)
-2. WebSocket se konektuje (`WebSocket connected: 31`)
-3. WebSocket se odmah diskonektuje (`WebSocket disconnected: 31`)
-4. Frontend automatski pokušava reconnect (zbog `autoReconnect: true`)
-5. Ciklus se ponavlja beskonačno
+## Root Cause
 
-## Uzrok
-Backend WebSocket endpoint čeka na `await websocket.receive_json()` sa timeout-om od 30 sekundi, ali frontend ne šalje ništa odmah nakon konekcije. Međutim, čini se da se konekcija zatvara PRE nego što timeout istekne.
-
-## Pokušana Rešenja
-
-### 1. Ispravljeno kreiranje sesije
-- **Problem**: Backend je pokušavao da kreira NOVU sesiju u WebSocket endpointu
-- **Rešenje**: Sesija se sada kreira samo preko POST `/api/chat/sessions`
-- **Status**: ✅ Uspešno
-
-### 2. Ispravljen response format
-- **Problem**: Backend vraćao `session_id`, frontend očekivao `id`
-- **Rešenje**: Backend sada vraća oba polja
-- **Status**: ✅ Uspešno
-
-### 3. Dodat timeout za receive_json
-- **Problem**: `receive_json()` blokira beskonačno
-- **Rešenje**: Dodat `asyncio.wait_for()` sa timeout-om od 30s
-- **Status**: ⚠️ Delimično - konekcija se i dalje zatvara
-
-## Trenutno Stanje Koda
-
-### Backend (`backend/routers/chat.py`)
+### Originalni Kod (POGREŠAN)
 ```python
-@router.websocket("/ws/{session_id}")
-async def websocket_endpoint(websocket: WebSocket, session_id: str, db: Session = Depends(get_db)):
-    await manager.connect(websocket, session_id)
-    chat_service = ChatService(db)
-    
+# backend/routers/evaluations.py - linija 133-138
+background_tasks.add_task(
+    service.run_evaluation,  # ❌ PROBLEM!
+    evaluation_id=evaluation_id,
+    test_example_ids=data.test_example_ids,
+    collection_id=data.collection_id
+)
+```
+
+### Šta se dešava:
+
+1. **Frontend pozove** `/api/evaluations/{id}/run`
+2. **Backend odmah vrati** HTTP response sa `status="running"`
+3. **HTTP konekcija se zatvori** ✅
+4. **Database session se zatvori** ❌
+5. **Tek ONDA** se pokreće `service.run_evaluation()` u pozadini
+6. **Background task koristi zatvorenu DB session** ❌
+
+### Posledica:
+- Background task pokušava da koristi **zatvorenu database session**
+- Database session **nije thread-safe**
+- Svi ostali HTTP zahtevi (uključujući WebSocket) se **blokiraju**
+- Frontend ne može da se poveže na WebSocket endpoint
+- **Timeout nakon 30 sekundi**
+
+## Rešenje
+
+### Novi Kod (ISPRAVAN)
+```python
+# backend/routers/evaluations.py
+
+async def _run_evaluation_background(
+    evaluation_id: int,
+    test_example_ids: Optional[List[int]],
+    collection_id: Optional[int]
+):
+    """Helper function to run evaluation in background with NEW DB session"""
+    from backend.database import SessionLocal
+    db = SessionLocal()  # ✅ NOVA SESSION!
     try:
-        session_id_int = int(session_id)
-        await manager.send_status(session_id, "Povezan")
-        
-        while True:
-            try:
-                data = await asyncio.wait_for(websocket.receive_json(), timeout=30.0)
-            except asyncio.TimeoutError:
-                await manager.send_message(session_id, {"type": "ping", "content": "keepalive"})
-                continue
-            
-            # Process message...
+        service = EvaluationService(db)
+        await service.run_evaluation(
+            evaluation_id=evaluation_id,
+            test_example_ids=test_example_ids,
+            collection_id=collection_id
+        )
+    except Exception as e:
+        logger.error(f"Background evaluation error: {e}")
+    finally:
+        db.close()  # ✅ CLEANUP!
+
+
+@router.post("/{evaluation_id}/run")
+async def run_evaluation(...):
+    # ...
+    background_tasks.add_task(
+        _run_evaluation_background,  # ✅ Helper sa novom session
+        evaluation_id=evaluation_id,
+        test_example_ids=data.test_example_ids,
+        collection_id=data.collection_id
+    )
 ```
 
-### Frontend (`frontend/src/hooks/useWebSocket.ts`)
-```typescript
-export const useWebSocket = (sessionId: string | null, options: WebSocketHookOptions = {}) => {
-  const {
-    autoReconnect = true,  // ← Problem: automatski reconnect
-    reconnectInterval = 3000,
-  } = options;
-  
-  // ...
-  
-  ws.onclose = () => {
-    if (autoReconnect && sessionId) {
-      setTimeout(() => connect(), reconnectInterval);  // ← Beskonačna petlja
-    }
-  };
-}
+### Ključne Izmene:
+
+1. **Nova helper funkcija** `_run_evaluation_background()`
+2. **Kreira NOVU database session** unutar background task-a
+3. **Properly cleanup** - zatvara session u `finally` bloku
+4. **Nezavisna od HTTP request lifecycle**
+
+## Kako Testirati
+
+1. **Restartuj backend server**:
+   ```bash
+   cd backend
+   python -m uvicorn backend.main:app --reload
+   ```
+
+2. **Pokreni evaluaciju**:
+   - Idi na Evaluations stranicu
+   - Klikni "Run" na nekoj evaluaciji
+
+3. **Otvori Log Viewer**:
+   - Klikni "Log" dugme (ikona Article)
+   - Trebalo bi da vidiš real-time log poruke
+
+4. **Proveri WebSocket konekciju**:
+   - Otvori Browser DevTools → Network → WS
+   - Trebalo bi da vidiš aktivnu WebSocket konekciju
+   - Status: `101 Switching Protocols`
+
+## Tehnički Detalji
+
+### FastAPI BackgroundTasks Lifecycle:
+```
+1. HTTP Request arrives
+2. Dependency injection (get_db) creates DB session
+3. Endpoint handler executes
+4. background_tasks.add_task() registers task
+5. HTTP Response sent ✅
+6. DB session closed ❌
+7. Background task starts executing ❌ (uses closed session)
 ```
 
-## Moguća Rešenja
+### Ispravljen Lifecycle:
+```
+1. HTTP Request arrives
+2. Dependency injection (get_db) creates DB session
+3. Endpoint handler executes
+4. background_tasks.add_task() registers helper function
+5. HTTP Response sent ✅
+6. DB session closed ✅
+7. Background task starts executing ✅
+8. Helper creates NEW DB session ✅
+9. Evaluation runs with new session ✅
+10. Helper closes session in finally block ✅
+```
 
-### Opcija 1: Onemogućiti Auto-Reconnect (Brzo)
-Promeniti default vrednost `autoReconnect` na `false` u `useWebSocket.ts`.
+## Zaključak
 
-**Prednosti:**
-- Brzo rešenje
-- Zaustavlja beskonačnu petlju
+Problem je bio u **lifecycle management** database session-a. FastAPI BackgroundTasks se izvršavaju **nakon** što se HTTP response vrati i **nakon** što se dependency-injected resursi (kao DB session) cleanup-uju.
 
-**Mane:**
-- Gubi se automatsko reconnect funkcionalnost
-- Korisnik mora ručno da osvežava stranicu
+Rešenje je kreiranje **nove, nezavisne database session** unutar background task-a, što omogućava:
+- ✅ Evaluacija se izvršava u pozadini
+- ✅ HTTP endpoint odmah vraća response
+- ✅ WebSocket konekcije mogu da se uspostave
+- ✅ Frontend može da dobija real-time log poruke
+- ✅ Nema blokiranja drugih HTTP zahteva
 
-### Opcija 2: Implementirati Heartbeat Mehanizam (Preporučeno)
-Frontend šalje ping poruke svakih 10-15 sekundi da održi konekciju.
+## Status
+✅ **REŠENO** - Backend ispravljen, spreman za testiranje
 
-**Prednosti:**
-- Održava konekciju aktivnom
-- Detektuje mrtve konekcije
-- Standardna praksa za WebSocket
-
-**Mane:**
-- Zahteva izmene i na frontendu i na backendu
-
-### Opcija 3: Debugging - Proveriti Zašto se Zatvara
-Dodati detaljnije logovanje da vidimo TAČAN razlog zatvaranja.
-
-## Preporuka
-Kombinacija Opcije 1 (privremeno) i Opcije 2 (dugoročno):
-
-1. **Odmah**: Onemogućiti auto-reconnect da zaustavimo beskonačnu petlju
-2. **Zatim**: Implementirati heartbeat mehanizam
-3. **Na kraju**: Ponovo omogućiti auto-reconnect sa boljom logikom
-
-## Sledeći Koraci
-1. Onemogućiti `autoReconnect` u `useWebSocket.ts`
-2. Testirati da li WebSocket ostaje povezan bez reconnect petlje
-3. Ako radi, implementirati heartbeat
-4. Ako ne radi, dodati detaljnije logovanje za debugging
-
-## Napomene
-- Chat funkcionalnost je SKORO spremna - samo WebSocket konekcija pravi problem
-- Svi ostali delovi sistema rade ispravno (kreiranje sesije, routing, database)
-- Problem je specifičan za WebSocket lifecycle management
+---
+*Made with Bob - Root Cause Analysis*

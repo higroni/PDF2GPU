@@ -5,6 +5,7 @@ Business logika za evaluaciju test primera
 import logging
 import time
 import json
+import asyncio
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 from sqlalchemy.orm import Session
@@ -17,6 +18,40 @@ from backend.services.chat_service import ChatService
 from backend.utils.metrics import calculate_all_metrics, calculate_exact_match, calculate_word_overlap
 
 logger = logging.getLogger(__name__)
+
+# Import log broadcaster (will be set after router is loaded)
+_log_broadcaster = None
+
+# Track cancelled evaluations
+_cancelled_evaluations: set = set()
+
+def set_log_broadcaster(broadcaster):
+    """Set the log broadcaster instance"""
+    global _log_broadcaster
+    _log_broadcaster = broadcaster
+
+async def broadcast_log(evaluation_id: int, level: str, message: str):
+    """Broadcast log message if broadcaster is available"""
+    if _log_broadcaster:
+        try:
+            await _log_broadcaster.broadcast_log(evaluation_id, level, message)
+        except Exception as e:
+            logger.error(f"Failed to broadcast log: {e}")
+
+def cancel_evaluation(evaluation_id: int):
+    """Mark evaluation as cancelled"""
+    global _cancelled_evaluations
+    _cancelled_evaluations.add(evaluation_id)
+    logger.info(f"Evaluation {evaluation_id} marked for cancellation")
+
+def is_evaluation_cancelled(evaluation_id: int) -> bool:
+    """Check if evaluation is cancelled"""
+    return evaluation_id in _cancelled_evaluations
+
+def clear_cancellation(evaluation_id: int):
+    """Clear cancellation flag"""
+    global _cancelled_evaluations
+    _cancelled_evaluations.discard(evaluation_id)
 
 
 class EvaluationService:
@@ -92,6 +127,9 @@ class EvaluationService:
         evaluation.started_at = datetime.utcnow()
         self.db.commit()
         
+        # Broadcast start log
+        await broadcast_log(evaluation_id, "INFO", f"Pokrenuta evaluacija '{evaluation.name}'")
+        
         try:
             # Dohvati test primere
             query = self.db.query(TestExample).filter(TestExample.is_active == True)
@@ -110,11 +148,24 @@ class EvaluationService:
             self.db.commit()
             
             logger.info(f"Running evaluation {evaluation_id} on {len(test_examples)} test examples")
+            await broadcast_log(evaluation_id, "INFO", f"Pronađeno {len(test_examples)} test primera za evaluaciju")
             
             # Pokreni evaluaciju za svaki test primer
             results = []
             for i, test_example in enumerate(test_examples, 1):
+                # Check if evaluation was cancelled
+                if is_evaluation_cancelled(evaluation_id):
+                    await broadcast_log(evaluation_id, "WARNING", f"Evaluacija zaustavljena od strane korisnika nakon {i-1}/{len(test_examples)} primera")
+                    evaluation.status = "cancelled"
+                    evaluation.completed_at = datetime.utcnow()
+                    self.db.commit()
+                    clear_cancellation(evaluation_id)
+                    logger.info(f"Evaluation {evaluation_id} cancelled by user")
+                    return evaluation
+                
                 try:
+                    await broadcast_log(evaluation_id, "INFO", f"Evaluacija primera {i}/{len(test_examples)}: {test_example.question[:50]}...")
+                    
                     result = await self._evaluate_single_example(
                         evaluation_id=evaluation_id,
                         test_example=test_example,
@@ -125,8 +176,12 @@ class EvaluationService:
                     # Ažuriraj completed_examples nakon svakog primera
                     evaluation.completed_examples = i
                     self.db.commit()
+                    
+                    bleu_str = f"{result.bleu_score:.3f}" if result.bleu_score is not None else "N/A"
+                    await broadcast_log(evaluation_id, "INFO", f"Primer {i}/{len(test_examples)} završen - BLEU: {bleu_str}")
                 except Exception as e:
                     logger.error(f"Error evaluating test example {test_example.id}: {e}")
+                    await broadcast_log(evaluation_id, "ERROR", f"Greška pri evaluaciji primera {i}: {str(e)}")
                     # Nastavi sa ostalim primerima
                     continue
             

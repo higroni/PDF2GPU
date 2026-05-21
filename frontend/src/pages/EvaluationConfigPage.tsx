@@ -99,12 +99,12 @@ const EvaluationConfigPage: React.FC = () => {
       use_spell_check: true
     },
     chunking: {
-      strategy: 'semantic',
-      chunk_size: 512,
-      chunk_overlap: 50
+      strategy: 'semantic',  // Default from backend/config.py
+      chunk_size: 500,       // Default from backend/config.py
+      chunk_overlap: 50      // Default from backend/config.py
     },
     embeddings: {
-      model: 'BAAI/bge-m3',
+      model: 'BAAI/bge-m3',  // Default from backend/config.py
       dimensions: 1024
     },
     vector_storage: {
@@ -116,17 +116,17 @@ const EvaluationConfigPage: React.FC = () => {
       use_spell_check: true
     },
     search: {
-      top_k: 10,
+      top_k: 10,             // Default from backend/config.py
       score_threshold: 0.5
     },
     reranking: {
-      enabled: true,
-      model: 'BAAI/bge-reranker-v2-m3',
-      top_n: 5
+      enabled: true,         // Default from backend/config.py
+      model: 'BAAI/bge-reranker-v2-m3',  // Default from backend/config.py
+      top_n: 5               // Default from backend/config.py
     },
     llm: {
-      model: 'llama3.2:latest',
-      temperature: 0.7,
+      model: 'qwen2.5:14b',  // Default from backend/config.py
+      temperature: 0.1,      // Default from backend/config.py
       max_tokens: 2048,
       system_prompt: 'Ti si AI asistent specijalizovan za odgovaranje na pitanja na osnovu dostavljenih dokumenata. Odgovaraj precizno, jasno i na srpskom jeziku.'
     }
@@ -200,7 +200,7 @@ const EvaluationConfigPage: React.FC = () => {
         description: description?.trim(),
         collection_id: collectionId,
         test_example_ids: testExampleIds.length > 0 ? testExampleIds : [],
-        config: config
+        config_snapshot: config
       });
 
       // Ako je "Create & Run", pokreni odmah
@@ -304,41 +304,55 @@ const EvaluationConfigPage: React.FC = () => {
 
       case 2: // Chunking
         return (
-          <ConfigSection
-            title="Chunking Strategy"
-            description="Configure how documents are split into chunks"
-            params={[
-              {
-                name: 'strategy',
-                label: 'Strategy',
-                type: 'text',
-                value: config.chunking.strategy,
-                tooltip: 'Chunking strategy (semantic, fixed, etc.)'
-              },
-              {
-                name: 'chunk_size',
-                label: 'Chunk Size',
-                type: 'slider',
-                value: config.chunking.chunk_size,
-                min: 128,
-                max: 2048,
-                step: 128,
-                tooltip: 'Maximum size of each chunk in tokens'
-              },
-              {
-                name: 'chunk_overlap',
-                label: 'Chunk Overlap',
-                type: 'slider',
-                value: config.chunking.chunk_overlap,
-                min: 0,
-                max: 200,
-                step: 10,
-                tooltip: 'Number of overlapping tokens between chunks'
-              }
-            ]}
-            onChange={(param, value) => handleConfigChange('chunking', param, value)}
-            collapsible={false}
-          />
+          <Box>
+            <ConfigSection
+              title="Chunking Strategy"
+              description="Konfigurišite kako se dokumenti dele na chunk-ove"
+              params={[
+                {
+                  name: 'chunk_size',
+                  label: 'Veličina Chunk-a',
+                  type: 'slider',
+                  value: config.chunking.chunk_size,
+                  min: 128,
+                  max: 2048,
+                  step: 128,
+                  tooltip: 'Maksimalna veličina svakog chunk-a u karakterima'
+                },
+                {
+                  name: 'chunk_overlap',
+                  label: 'Preklapanje Chunk-ova',
+                  type: 'slider',
+                  value: config.chunking.chunk_overlap,
+                  min: 0,
+                  max: 200,
+                  step: 10,
+                  tooltip: 'Broj karaktera koji se preklapaju između chunk-ova'
+                }
+              ]}
+              onChange={(param, value) => handleConfigChange('chunking', param, value)}
+              collapsible={false}
+            />
+            <FormControl fullWidth sx={{ mt: 2 }}>
+              <InputLabel>Strategija Segmentacije</InputLabel>
+              <Select
+                value={config.chunking.strategy}
+                onChange={(e) => handleConfigChange('chunking', 'strategy', e.target.value)}
+                label="Strategija Segmentacije"
+              >
+                <MenuItem value="semantic">Semantic - Semantička segmentacija (preporučeno)</MenuItem>
+                <MenuItem value="fixed">Fixed - Fiksna veličina</MenuItem>
+                <MenuItem value="sentence">Sentence - Po rečenicama</MenuItem>
+              </Select>
+              <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
+                Semantic: Deli tekst na osnovu semantičkog značenja (najbolje za RAG)
+                <br />
+                Fixed: Deli tekst na fiksne delove određene veličine
+                <br />
+                Sentence: Deli tekst po granicama rečenica
+              </Typography>
+            </FormControl>
+          </Box>
         );
 
       case 3: // Embeddings

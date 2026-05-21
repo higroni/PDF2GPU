@@ -7,7 +7,7 @@ export interface Evaluation {
   id: number;
   name: string;
   description?: string;
-  status: 'pending' | 'running' | 'completed' | 'failed';
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
   created_at: string;
   started_at?: string;
   completed_at?: string;
@@ -19,6 +19,7 @@ export interface Evaluation {
   avg_rouge_l?: number;
   avg_bert_score?: number;
   exact_match_percentage?: number;
+  collection_id?: number;
 }
 
 export interface EvaluationCreate {
@@ -94,6 +95,14 @@ export const runEvaluation = async (
   data: EvaluationRun
 ): Promise<Evaluation> => {
   const response = await apiClient.post(`/api/evaluations/${id}/run`, data);
+  return response.data;
+};
+
+/**
+ * Zaustavlja evaluaciju koja je u toku
+ */
+export const stopEvaluation = async (id: number): Promise<{ message: string }> => {
+  const response = await apiClient.post(`/api/evaluations/${id}/stop`);
   return response.data;
 };
 

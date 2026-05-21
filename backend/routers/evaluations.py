@@ -111,6 +111,27 @@ async def create_evaluation(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+async def _run_evaluation_background(
+    evaluation_id: int,
+    test_example_ids: Optional[List[int]],
+    collection_id: Optional[int]
+):
+    """Helper function to run evaluation in background with new DB session"""
+    from backend.database import SessionLocal
+    db = SessionLocal()
+    try:
+        service = EvaluationService(db)
+        await service.run_evaluation(
+            evaluation_id=evaluation_id,
+            test_example_ids=test_example_ids,
+            collection_id=collection_id
+        )
+    except Exception as e:
+        logger.error(f"Background evaluation error: {e}")
+    finally:
+        db.close()
+
+
 @router.post("/{evaluation_id}/run", response_model=EvaluationResponse)
 async def run_evaluation(
     evaluation_id: int,
@@ -129,9 +150,9 @@ async def run_evaluation(
         if not evaluation:
             raise HTTPException(status_code=404, detail="Evaluation not found")
         
-        # Pokreni evaluaciju u pozadini
+        # Pokreni evaluaciju u pozadini sa NOVOM DB session
         background_tasks.add_task(
-            service.run_evaluation,
+            _run_evaluation_background,
             evaluation_id=evaluation_id,
             test_example_ids=data.test_example_ids,
             collection_id=data.collection_id
@@ -294,6 +315,38 @@ async def get_evaluation_statistics(
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         logger.error(f"Error getting evaluation statistics: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/{evaluation_id}/stop")
+async def stop_evaluation(
+    evaluation_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Zaustavlja evaluaciju koja je u toku
+    """
+    try:
+        from backend.services.evaluation_service import cancel_evaluation
+        
+        service = EvaluationService(db)
+        evaluation = service.get_evaluation(evaluation_id)
+        
+        if not evaluation:
+            raise HTTPException(status_code=404, detail="Evaluation not found")
+        
+        if evaluation.status != "running":
+            raise HTTPException(status_code=400, detail="Evaluation is not running")
+        
+        # Mark evaluation for cancellation
+        cancel_evaluation(evaluation_id)
+        logger.info(f"Stop requested for evaluation {evaluation_id}")
+        
+        return {"message": "Evaluation stop requested"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error stopping evaluation: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

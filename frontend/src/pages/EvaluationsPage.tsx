@@ -46,6 +46,9 @@ import {
   Refresh as RefreshIcon,
   Compare as CompareIcon,
   Settings as SettingsIcon,
+  Article as LogIcon,
+  Stop as StopIcon,
+  Replay as ReplayIcon,
 } from '@mui/icons-material';
 import {
   getEvaluations,
@@ -55,6 +58,7 @@ import {
   getEvaluation,
   getEvaluationStatistics,
   pollEvaluationStatus,
+  stopEvaluation,
   Evaluation,
   EvaluationCreate,
   EvaluationRun,
@@ -63,6 +67,7 @@ import {
 import { getTestExamples, TestExample } from '../api/testExamples';
 import { collectionsApi } from '../api/collections';
 import type { Collection } from '../types/api';
+import LogViewerDialog from '../components/LogViewerDialog';
 
 const EvaluationsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -76,6 +81,7 @@ const EvaluationsPage: React.FC = () => {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [runDialogOpen, setRunDialogOpen] = useState(false);
   const [statsDialogOpen, setStatsDialogOpen] = useState(false);
+  const [logDialogOpen, setLogDialogOpen] = useState(false);
   const [selectedEvaluation, setSelectedEvaluation] = useState<Evaluation | null>(null);
   const [statistics, setStatistics] = useState<EvaluationStatistics | null>(null);
   
@@ -206,6 +212,36 @@ const EvaluationsPage: React.FC = () => {
     }
   };
 
+  const handleStopEvaluation = async (evaluation: Evaluation) => {
+    if (!window.confirm(`Da li ste sigurni da želite da zaustavite evaluaciju "${evaluation.name}"?`)) {
+      return;
+    }
+    
+    try {
+      await stopEvaluation(evaluation.id);
+      await loadData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to stop evaluation');
+    }
+  };
+
+  const handleRestartEvaluation = async (evaluation: Evaluation) => {
+    if (!window.confirm(`Da li želite da ponovo pokrenete evaluaciju "${evaluation.name}" sa istim parametrima?`)) {
+      return;
+    }
+    
+    try {
+      // Pokreni evaluaciju sa istim collection_id (ako postoji)
+      await runEvaluation(evaluation.id, {
+        collection_id: evaluation.collection_id
+      });
+      startPolling(evaluation.id);
+      await loadData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to restart evaluation');
+    }
+  };
+
   const resetCreateForm = () => {
     setCreateForm({
       name: '',
@@ -225,6 +261,7 @@ const EvaluationsPage: React.FC = () => {
       case 'completed': return 'success';
       case 'running': return 'info';
       case 'failed': return 'error';
+      case 'cancelled': return 'warning';
       case 'pending': return 'default';
       default: return 'default';
     }
@@ -412,12 +449,83 @@ const EvaluationsPage: React.FC = () => {
                       </IconButton>
                     </Tooltip>
                   )}
+                  {evaluation.status === 'running' && (
+                    <>
+                      <Tooltip title="Zaustavi">
+                        <IconButton
+                          size="small"
+                          color="error"
+                          onClick={() => handleStopEvaluation(evaluation)}
+                        >
+                          <StopIcon />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Prikaži Log">
+                        <IconButton
+                          size="small"
+                          color="primary"
+                          onClick={() => {
+                            setSelectedEvaluation(evaluation);
+                            setLogDialogOpen(true);
+                          }}
+                        >
+                          <LogIcon />
+                        </IconButton>
+                      </Tooltip>
+                    </>
+                  )}
                   {evaluation.status === 'completed' && (
-                    <Tooltip title="Statistike">
-                      <IconButton size="small" onClick={() => handleViewStatistics(evaluation)}>
-                        <AssessmentIcon />
-                      </IconButton>
-                    </Tooltip>
+                    <>
+                      <Tooltip title="Restart">
+                        <IconButton
+                          size="small"
+                          color="success"
+                          onClick={() => handleRestartEvaluation(evaluation)}
+                        >
+                          <ReplayIcon />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Statistike">
+                        <IconButton size="small" onClick={() => handleViewStatistics(evaluation)}>
+                          <AssessmentIcon />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Prikaži Log">
+                        <IconButton
+                          size="small"
+                          onClick={() => {
+                            setSelectedEvaluation(evaluation);
+                            setLogDialogOpen(true);
+                          }}
+                        >
+                          <LogIcon />
+                        </IconButton>
+                      </Tooltip>
+                    </>
+                  )}
+                  {evaluation.status === 'cancelled' && (
+                    <>
+                      <Tooltip title="Restart">
+                        <IconButton
+                          size="small"
+                          color="success"
+                          onClick={() => handleRestartEvaluation(evaluation)}
+                        >
+                          <ReplayIcon />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Prikaži Log">
+                        <IconButton
+                          size="small"
+                          onClick={() => {
+                            setSelectedEvaluation(evaluation);
+                            setLogDialogOpen(true);
+                          }}
+                        >
+                          <LogIcon />
+                        </IconButton>
+                      </Tooltip>
+                    </>
                   )}
                   <Tooltip title="Obriši">
                     <IconButton size="small" onClick={() => handleDelete(evaluation.id)}>
@@ -669,6 +777,19 @@ const EvaluationsPage: React.FC = () => {
           <Button onClick={() => setStatsDialogOpen(false)}>Zatvori</Button>
         </DialogActions>
       </Dialog>
+
+      {/* Log Viewer Dialog */}
+      {selectedEvaluation && (
+        <LogViewerDialog
+          open={logDialogOpen}
+          onClose={() => {
+            setLogDialogOpen(false);
+            setSelectedEvaluation(null);
+          }}
+          evaluationId={selectedEvaluation.id}
+          evaluationName={selectedEvaluation.name}
+        />
+      )}
     </Container>
   );
 };

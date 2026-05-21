@@ -15,6 +15,7 @@ from backend.routers.chat import router as chat_router
 from backend.routers.test_examples import router as test_examples_router
 from backend.routers.evaluations import router as evaluations_router
 from backend.routers.models import router as models_router
+from backend.routers.evaluation_logs import router as evaluation_logs_router
 from backend.dependencies import get_rag_engine
 
 # Setup logging with ASCII encoding
@@ -69,6 +70,7 @@ app.include_router(chat_router, prefix="/api")
 app.include_router(test_examples_router)
 app.include_router(evaluations_router)
 app.include_router(models_router, prefix="/api")
+app.include_router(evaluation_logs_router)  # WebSocket router (no prefix)
 
 
 @app.on_event("startup")
@@ -83,6 +85,15 @@ async def startup_event():
     except Exception as e:
         logger.error(f"Failed to initialize database: {e}")
         raise
+    
+    # Initialize log broadcaster for evaluation service
+    try:
+        from backend.routers.evaluation_logs import log_broadcaster
+        from backend.services.evaluation_service import set_log_broadcaster
+        set_log_broadcaster(log_broadcaster)
+        logger.info("Evaluation log broadcaster initialized")
+    except Exception as e:
+        logger.warning(f"Failed to initialize log broadcaster: {e}")
     
     logger.info("PDF2GPU API started successfully")
     logger.info("RAG Engine will be initialized on first use")
