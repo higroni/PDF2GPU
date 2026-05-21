@@ -200,7 +200,7 @@ const EvaluationConfigPage: React.FC = () => {
         description: description?.trim(),
         collection_id: collectionId,
         test_example_ids: testExampleIds.length > 0 ? testExampleIds : [],
-        config_snapshot: config
+        config: config
       });
 
       // Ako je "Create & Run", pokreni odmah

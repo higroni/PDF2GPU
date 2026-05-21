@@ -48,6 +48,7 @@ class EvaluationResponse(BaseModel):
     avg_rouge_l: Optional[float]
     avg_bert_score: Optional[float]
     exact_match_percentage: Optional[float]
+    collection_id: Optional[int] = None
     
     class Config:
         from_attributes = True
@@ -213,7 +214,8 @@ async def list_evaluations(
                 avg_rouge_2=e.avg_rouge_2,
                 avg_rouge_l=e.avg_rouge_l,
                 avg_bert_score=e.avg_bert_score,
-                exact_match_percentage=e.exact_match_percentage
+                exact_match_percentage=e.exact_match_percentage,
+                collection_id=e.collection_id
             )
             for e in evaluations
         ]
@@ -348,6 +350,56 @@ async def stop_evaluation(
     except Exception as e:
         logger.error(f"Error stopping evaluation: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/{evaluation_id}/chat-session")
+async def create_chat_session_from_evaluation(
+    evaluation_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Kreira chat sesiju sa konfiguracijom iz evaluacije
+    
+    Args:
+        evaluation_id: ID evaluacije
+    
+    Returns:
+        Session ID i config snapshot
+    """
+    try:
+        # Dohvati evaluaciju
+        evaluation = db.query(Evaluation).filter(Evaluation.id == evaluation_id).first()
+        if not evaluation:
+            raise HTTPException(status_code=404, detail="Evaluacija nije pronađena")
+        
+        # Kreiraj chat sesiju sa collection_id iz evaluacije
+        from backend.services.chat_service import ChatService
+        chat_service = ChatService(db)
+        session = await chat_service.create_session(evaluation.collection_id)
+        
+        # Parse config snapshot
+        import json
+        config = {}
+        if evaluation.config_snapshot:
+            try:
+                config = json.loads(evaluation.config_snapshot)
+            except json.JSONDecodeError:
+                logger.warning(f"Failed to parse config_snapshot for evaluation {evaluation_id}")
+        
+        return {
+            "session_id": session.id,
+            "collection_id": evaluation.collection_id,
+            "evaluation_id": evaluation_id,
+            "evaluation_name": evaluation.name,
+            "config": config,
+            "started_at": session.started_at.isoformat()
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating chat session from evaluation {evaluation_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 
 @router.delete("/{evaluation_id}")

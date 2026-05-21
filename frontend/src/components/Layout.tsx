@@ -40,7 +40,7 @@ const navigationItems = [
   { path: '/search', label: 'Pretraga', icon: <SearchIcon /> },
   { path: '/chat', label: 'Chat', icon: <ChatIcon /> },
   { path: '/test-examples', label: 'Test Primeri', icon: <QuizIcon /> },
-  { path: '/evaluations', label: 'Evaluacije', icon: <AssessmentIcon /> },
+  { path: '/evaluations', label: 'Konfiguracije', icon: <AssessmentIcon /> },
 ];
 
 export const Layout: React.FC<LayoutProps> = ({ children }) => {

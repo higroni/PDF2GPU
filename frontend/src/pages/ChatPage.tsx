@@ -1,6 +1,6 @@
 /**
  * ChatPage
- * Stranica za chat funkcionalnost sa selekcijom kolekcije
+ * Stranica za chat funkcionalnost sa selekcijom evaluacije (konfiguracije)
  */
 import React, { useState, useEffect } from 'react';
 import {
@@ -14,30 +14,52 @@ import {
   Button,
   Alert,
   CircularProgress,
+  Chip,
+  Stack,
+  Link,
+  Popover,
+  Paper,
+  IconButton,
 } from '@mui/material';
-import { Chat as ChatIcon } from '@mui/icons-material';
+import { Chat as ChatIcon, Info as InfoIcon, Close as CloseIcon } from '@mui/icons-material';
 import ChatWindow from '../components/chat/ChatWindow';
-import { useCollections } from '../hooks/useCollections';
-import { apiClient } from '../api/client';
+import { getEvaluations, createChatSessionFromEvaluation, type Evaluation, type EvaluationChatSession } from '../api/evaluations';
 
 export const ChatPage: React.FC = () => {
-  const [selectedCollectionId, setSelectedCollectionId] = useState<number | null>(null);
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [evaluations, setEvaluations] = useState<Evaluation[]>([]);
+  const [selectedEvaluationId, setSelectedEvaluationId] = useState<number | null>(null);
+  const [session, setSession] = useState<EvaluationChatSession | null>(null);
   const [isCreatingSession, setIsCreatingSession] = useState(false);
+  const [isLoadingEvaluations, setIsLoadingEvaluations] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [promptAnchor, setPromptAnchor] = useState<HTMLElement | null>(null);
 
-  const { data: collections, isLoading: isLoadingCollections } = useCollections();
-
-  // Auto-select first collection if available
   useEffect(() => {
-    if (collections && collections.length > 0 && !selectedCollectionId) {
-      setSelectedCollectionId(collections[0].id);
+    loadEvaluations();
+  }, []);
+
+  const loadEvaluations = async () => {
+    try {
+      setIsLoadingEvaluations(true);
+      const data = await getEvaluations(0, 100);
+      // Filter only evaluations with collection_id
+      const validEvaluations = data.filter(e => e.collection_id);
+      setEvaluations(validEvaluations);
+      
+      // Auto-select first evaluation if available
+      if (validEvaluations.length > 0 && !selectedEvaluationId) {
+        setSelectedEvaluationId(validEvaluations[0].id);
+      }
+    } catch (err) {
+      setError('Greška pri učitavanju evaluacija');
+    } finally {
+      setIsLoadingEvaluations(false);
     }
-  }, [collections, selectedCollectionId]);
+  };
 
   const handleStartChat = async () => {
-    if (!selectedCollectionId) {
-      setError('Molimo izaberite kolekciju');
+    if (!selectedEvaluationId) {
+      setError('Molimo izaberite evaluaciju');
       return;
     }
 
@@ -45,12 +67,8 @@ export const ChatPage: React.FC = () => {
     setError(null);
 
     try {
-      const response = await apiClient.post('/api/chat/sessions', {
-        collection_id: selectedCollectionId,
-      });
-
-      console.log('Session response:', response.data);
-      setSessionId(response.data.id?.toString() || response.data.session_id?.toString());
+      const sessionData = await createChatSessionFromEvaluation(selectedEvaluationId);
+      setSession(sessionData);
     } catch (err: any) {
       console.error('Failed to create chat session:', err);
       setError(err.response?.data?.detail || 'Greška pri kreiranju chat sesije');
@@ -60,19 +78,102 @@ export const ChatPage: React.FC = () => {
   };
 
   const handleEndChat = () => {
-    setSessionId(null);
+    setSession(null);
     setError(null);
+    setPromptAnchor(null);
   };
 
-  const selectedCollection = collections?.find((c) => c.id === selectedCollectionId);
+  const handlePromptClick = (event: React.MouseEvent<HTMLElement>) => {
+    setPromptAnchor(event.currentTarget);
+  };
 
-  if (sessionId) {
+  const handlePromptClose = () => {
+    setPromptAnchor(null);
+  };
+
+  const getConfigSummary = () => {
+    if (!session?.config) return null;
+    
+    const llm = session.config.llm || {};
+    const search = session.config.search || {};
+    const reranking = session.config.reranking || {};
+    const chunking = session.config.chunking || {};
+    
+    return {
+      model: llm.model || 'N/A',
+      temperature: llm.temperature !== undefined ? llm.temperature : 'N/A',
+      top_k: search.top_k || 'N/A',
+      reranking: reranking.enabled ? 'Enabled' : 'Disabled',
+      chunking: chunking.strategy || 'N/A',
+      systemPrompt: llm.system_prompt || 'N/A'
+    };
+  };
+
+  const selectedEvaluation = evaluations.find(e => e.id === selectedEvaluationId);
+  const configSummary = getConfigSummary();
+  const promptOpen = Boolean(promptAnchor);
+
+  if (session) {
     return (
       <Container maxWidth="xl" sx={{ height: 'calc(100vh - 100px)', py: 3 }}>
+        <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Box sx={{ flex: 1 }}>
+            <Typography variant="h6">
+              Chat - {session.evaluation_name}
+            </Typography>
+            {configSummary && (
+              <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: 'wrap', gap: 0.5 }}>
+                <Chip label={`Model: ${configSummary.model}`} size="small" color="primary" variant="outlined" />
+                <Chip label={`Temp: ${configSummary.temperature}`} size="small" color="primary" variant="outlined" />
+                <Chip label={`Top-K: ${configSummary.top_k}`} size="small" color="primary" variant="outlined" />
+                <Chip label={`Reranking: ${configSummary.reranking}`} size="small" color="primary" variant="outlined" />
+                <Chip label={`Chunking: ${configSummary.chunking}`} size="small" color="primary" variant="outlined" />
+                <Link
+                  component="button"
+                  variant="caption"
+                  onClick={handlePromptClick}
+                  sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ml: 1 }}
+                >
+                  <InfoIcon fontSize="small" />
+                  Prikaži System Prompt
+                </Link>
+              </Stack>
+            )}
+          </Box>
+          <IconButton onClick={handleEndChat} size="small">
+            <CloseIcon />
+          </IconButton>
+        </Box>
+
+        {/* System Prompt Popover */}
+        <Popover
+          open={promptOpen}
+          anchorEl={promptAnchor}
+          onClose={handlePromptClose}
+          anchorOrigin={{
+            vertical: 'bottom',
+            horizontal: 'left',
+          }}
+          transformOrigin={{
+            vertical: 'top',
+            horizontal: 'left',
+          }}
+        >
+          <Paper sx={{ p: 2, maxWidth: 600, maxHeight: 400, overflow: 'auto' }}>
+            <Typography variant="subtitle2" gutterBottom>
+              System Prompt:
+            </Typography>
+            <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace', fontSize: '0.85rem' }}>
+              {configSummary?.systemPrompt || 'N/A'}
+            </Typography>
+          </Paper>
+        </Popover>
+
         <ChatWindow
-          sessionId={sessionId}
-          collectionId={selectedCollectionId || undefined}
-          collectionName={selectedCollection?.name}
+          sessionId={session.session_id.toString()}
+          collectionId={session.collection_id}
+          collectionName={session.evaluation_name}
+          evaluationConfig={session.config}
           onClose={handleEndChat}
         />
       </Container>
@@ -87,7 +188,7 @@ export const ChatPage: React.FC = () => {
           Chat sa dokumentima
         </Typography>
         <Typography variant="body1" color="text.secondary">
-          Izaberite kolekciju i započnite razgovor
+          Izaberite konfiguraciju i započnite razgovor
         </Typography>
       </Box>
 
@@ -98,26 +199,26 @@ export const ChatPage: React.FC = () => {
       )}
 
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-        <FormControl fullWidth disabled={isLoadingCollections || isCreatingSession}>
-          <InputLabel>Kolekcija</InputLabel>
+        <FormControl fullWidth disabled={isLoadingEvaluations || isCreatingSession}>
+          <InputLabel>Konfiguracija</InputLabel>
           <Select
-            value={selectedCollectionId || ''}
-            onChange={(e) => setSelectedCollectionId(Number(e.target.value))}
-            label="Kolekcija"
+            value={selectedEvaluationId || ''}
+            onChange={(e) => setSelectedEvaluationId(Number(e.target.value))}
+            label="Konfiguracija"
           >
-            {isLoadingCollections ? (
+            {isLoadingEvaluations ? (
               <MenuItem disabled>
                 <CircularProgress size={20} sx={{ mr: 1 }} />
                 Učitavanje...
               </MenuItem>
-            ) : collections && collections.length > 0 ? (
-              collections.map((collection) => (
-                <MenuItem key={collection.id} value={collection.id}>
-                  {collection.name} ({collection.pdf_count} dokumenata)
+            ) : evaluations.length > 0 ? (
+              evaluations.map((evaluation) => (
+                <MenuItem key={evaluation.id} value={evaluation.id}>
+                  {evaluation.name} - {evaluation.status}
                 </MenuItem>
               ))
             ) : (
-              <MenuItem disabled>Nema dostupnih kolekcija</MenuItem>
+              <MenuItem disabled>Nema dostupnih konfiguracija</MenuItem>
             )}
           </Select>
         </FormControl>
@@ -126,15 +227,15 @@ export const ChatPage: React.FC = () => {
           variant="contained"
           size="large"
           onClick={handleStartChat}
-          disabled={!selectedCollectionId || isCreatingSession}
+          disabled={!selectedEvaluationId || isCreatingSession}
           startIcon={isCreatingSession ? <CircularProgress size={20} /> : <ChatIcon />}
         >
           {isCreatingSession ? 'Kreiranje sesije...' : 'Započni chat'}
         </Button>
 
-        {collections && collections.length === 0 && !isLoadingCollections && (
+        {evaluations.length === 0 && !isLoadingEvaluations && (
           <Alert severity="info">
-            Nemate kreiranih kolekcija. Prvo kreirajte kolekciju i dodajte PDF dokumente.
+            Nemate dostupnih konfiguracija. Prvo kreirajte konfiguraciju u Evaluations sekciji.
           </Alert>
         )}
       </Box>

@@ -49,6 +49,7 @@ import {
   Article as LogIcon,
   Stop as StopIcon,
   Replay as ReplayIcon,
+  Chat as ChatIcon,
 } from '@mui/icons-material';
 import {
   getEvaluations,
@@ -68,6 +69,7 @@ import { getTestExamples, TestExample } from '../api/testExamples';
 import { collectionsApi } from '../api/collections';
 import type { Collection } from '../types/api';
 import LogViewerDialog from '../components/LogViewerDialog';
+import EvaluationChatDialog from '../components/EvaluationChatDialog';
 
 const EvaluationsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -82,6 +84,7 @@ const EvaluationsPage: React.FC = () => {
   const [runDialogOpen, setRunDialogOpen] = useState(false);
   const [statsDialogOpen, setStatsDialogOpen] = useState(false);
   const [logDialogOpen, setLogDialogOpen] = useState(false);
+  const [chatDialogOpen, setChatDialogOpen] = useState(false);
   const [selectedEvaluation, setSelectedEvaluation] = useState<Evaluation | null>(null);
   const [statistics, setStatistics] = useState<EvaluationStatistics | null>(null);
   
@@ -294,6 +297,11 @@ const EvaluationsPage: React.FC = () => {
     }
   };
 
+
+  const handleOpenChat = (evaluation: Evaluation) => {
+    setSelectedEvaluation(evaluation);
+    setChatDialogOpen(true);
+  };
   const canCompare = selectedForCompare.length === 2;
 
   if (loading) {
@@ -309,7 +317,7 @@ const EvaluationsPage: React.FC = () => {
       {/* Header */}
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Typography variant="h4" component="h1">
-          Evaluacije
+          Konfiguracije
         </Typography>
         
         <Stack direction="row" spacing={2}>
@@ -527,6 +535,15 @@ const EvaluationsPage: React.FC = () => {
                       </Tooltip>
                     </>
                   )}
+                  <Tooltip title="Chat sa Eval Konfiguracijom">
+                    <IconButton
+                      size="small"
+                      color="primary"
+                      onClick={() => handleOpenChat(evaluation)}
+                    >
+                      <ChatIcon />
+                    </IconButton>
+                  </Tooltip>
                   <Tooltip title="Obriši">
                     <IconButton size="small" onClick={() => handleDelete(evaluation.id)}>
                       <DeleteIcon />
@@ -784,6 +801,19 @@ const EvaluationsPage: React.FC = () => {
           open={logDialogOpen}
           onClose={() => {
             setLogDialogOpen(false);
+            setSelectedEvaluation(null);
+          }}
+          evaluationId={selectedEvaluation.id}
+          evaluationName={selectedEvaluation.name}
+        />
+      )}
+
+      {/* Chat Dialog */}
+      {selectedEvaluation && (
+        <EvaluationChatDialog
+          open={chatDialogOpen}
+          onClose={() => {
+            setChatDialogOpen(false);
             setSelectedEvaluation(null);
           }}
           evaluationId={selectedEvaluation.id}

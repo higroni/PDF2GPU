@@ -14,6 +14,7 @@ export interface ChatWindowProps {
   sessionId: string | null;
   collectionId?: number;
   collectionName?: string;
+  evaluationConfig?: Record<string, any>;
   onClose?: () => void;
 }
 
@@ -21,6 +22,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   sessionId,
   collectionId,
   collectionName,
+  evaluationConfig,
   onClose,
 }) => {
   const [messages, setMessages] = useState<ChatMessageProps[]>([]);

@@ -216,7 +216,7 @@ export interface EvaluationWithConfig {
   description?: string;
   collection_id: number;
   test_example_ids?: number[];
-  config_snapshot: Record<string, any>;
+  config: Record<string, any>;
 }
 
 export const createEvaluationWithConfig = async (
@@ -234,6 +234,25 @@ export const runEvaluationWithConfig = async (
   data: EvaluationRun
 ): Promise<Evaluation> => {
   const response = await apiClient.post(`/api/evaluations/${id}/run-with-config`, data);
+  return response.data;
+};
+
+/**
+ * Kreira chat sesiju sa konfiguracijom iz evaluacije
+ */
+export interface EvaluationChatSession {
+  session_id: number;
+  collection_id: number;
+  evaluation_id: number;
+  evaluation_name: string;
+  config: Record<string, any>;
+  started_at: string;
+}
+
+export const createChatSessionFromEvaluation = async (
+  evaluationId: number
+): Promise<EvaluationChatSession> => {
+  const response = await apiClient.post(`/api/evaluations/${evaluationId}/chat-session`);
   return response.data;
 };
 
