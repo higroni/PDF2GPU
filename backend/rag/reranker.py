@@ -44,7 +44,11 @@ class Reranker:
         logger.info(f"Ucitavam reranker model: {model_name}")
         logger.info(f"Device: {self.device}")
         
-        self.model = CrossEncoder(model_name, device=self.device)
+        self.model = CrossEncoder(
+            model_name,
+            device=self.device,
+            trust_remote_code=True
+        )
         
         # Proveri GPU memoriju ako je dostupna
         if self.device == "cuda":

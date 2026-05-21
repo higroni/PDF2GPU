@@ -27,6 +27,12 @@ interface PerformanceMetrics {
   avg_llm_generation_ms?: number;
   avg_total_latency_ms?: number;
   total_evaluation_time_seconds?: number;
+  // Legal-specific metrics
+  avg_legal_term_precision?: number;
+  avg_legal_term_recall?: number;
+  avg_legal_term_f1?: number;
+  avg_citation_accuracy?: number;
+  avg_completeness_score?: number;
 }
 
 interface PerformanceBreakdownProps {
@@ -181,6 +187,70 @@ const PerformanceBreakdown: React.FC<PerformanceBreakdownProps> = ({
               />
             </Box>
           </Grid>
+        )}
+        
+        {/* Legal Metrics Section */}
+        {(metrics.avg_legal_term_f1 !== undefined ||
+          metrics.avg_citation_accuracy !== undefined ||
+          metrics.avg_completeness_score !== undefined) && (
+          <>
+            <Grid item xs={12}>
+              <Box sx={{ mt: 2, pt: 2, borderTop: 1, borderColor: 'divider' }}>
+                <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                  Legal Document Metrics
+                </Typography>
+              </Box>
+            </Grid>
+            
+            {metrics.avg_legal_term_f1 !== undefined && (
+              <Grid item xs={12} sm={4}>
+                <Box textAlign="center">
+                  <Typography variant="body2" color="text.secondary" gutterBottom>
+                    Legal Term F1
+                  </Typography>
+                  <Typography variant="h6" color="primary">
+                    {(metrics.avg_legal_term_f1 * 100).toFixed(1)}%
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Precision: {metrics.avg_legal_term_precision ? (metrics.avg_legal_term_precision * 100).toFixed(1) : 'N/A'}% |
+                    Recall: {metrics.avg_legal_term_recall ? (metrics.avg_legal_term_recall * 100).toFixed(1) : 'N/A'}%
+                  </Typography>
+                </Box>
+              </Grid>
+            )}
+            
+            {metrics.avg_citation_accuracy !== undefined && (
+              <Grid item xs={12} sm={4}>
+                <Box textAlign="center">
+                  <Typography variant="body2" color="text.secondary" gutterBottom>
+                    Citation Accuracy
+                  </Typography>
+                  <Typography variant="h6" color="success.main">
+                    {(metrics.avg_citation_accuracy * 100).toFixed(1)}%
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Law article references
+                  </Typography>
+                </Box>
+              </Grid>
+            )}
+            
+            {metrics.avg_completeness_score !== undefined && (
+              <Grid item xs={12} sm={4}>
+                <Box textAlign="center">
+                  <Typography variant="body2" color="text.secondary" gutterBottom>
+                    Completeness
+                  </Typography>
+                  <Typography variant="h6" color="info.main">
+                    {(metrics.avg_completeness_score * 100).toFixed(1)}%
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Answer completeness
+                  </Typography>
+                </Box>
+              </Grid>
+            )}
+          </>
         )}
       </Grid>
 

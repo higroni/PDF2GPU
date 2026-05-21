@@ -16,6 +16,9 @@ router = APIRouter()
 # Store active WebSocket connections per evaluation
 active_connections: Dict[int, Set[WebSocket]] = {}
 
+# Store log buffer per evaluation (last 100 messages)
+log_buffers: Dict[int, list] = {}
+
 
 class EvaluationLogBroadcaster:
     """Broadcaster for evaluation logs"""
@@ -30,6 +33,14 @@ class EvaluationLogBroadcaster:
         
         active_connections[evaluation_id].add(websocket)
         logger.info(f"WebSocket connected for evaluation {evaluation_id}. Total connections: {len(active_connections[evaluation_id])}")
+        
+        # Send buffered logs to new client
+        if evaluation_id in log_buffers:
+            for log_entry in log_buffers[evaluation_id]:
+                try:
+                    await websocket.send_text(json.dumps(log_entry))
+                except Exception as e:
+                    logger.error(f"Error sending buffered log: {e}")
     
     @staticmethod
     def disconnect(evaluation_id: int, websocket: WebSocket):
@@ -45,27 +56,32 @@ class EvaluationLogBroadcaster:
     @staticmethod
     async def broadcast_log(evaluation_id: int, level: str, message: str):
         """Broadcast a log message to all connected clients"""
-        if evaluation_id not in active_connections:
-            return
-        
         log_entry = {
             "timestamp": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
             "level": level,
             "message": message
         }
         
-        # Send to all connected clients
-        disconnected = set()
-        for websocket in active_connections[evaluation_id]:
-            try:
-                await websocket.send_text(json.dumps(log_entry))
-            except Exception as e:
-                logger.error(f"Error sending log to WebSocket: {e}")
-                disconnected.add(websocket)
+        # Add to buffer (keep last 100 messages)
+        if evaluation_id not in log_buffers:
+            log_buffers[evaluation_id] = []
+        log_buffers[evaluation_id].append(log_entry)
+        if len(log_buffers[evaluation_id]) > 100:
+            log_buffers[evaluation_id].pop(0)
         
-        # Remove disconnected clients
-        for websocket in disconnected:
-            active_connections[evaluation_id].discard(websocket)
+        # Send to all connected clients
+        if evaluation_id in active_connections:
+            disconnected = set()
+            for websocket in active_connections[evaluation_id]:
+                try:
+                    await websocket.send_text(json.dumps(log_entry))
+                except Exception as e:
+                    logger.error(f"Error sending log to WebSocket: {e}")
+                    disconnected.add(websocket)
+            
+            # Remove disconnected clients
+            for websocket in disconnected:
+                active_connections[evaluation_id].discard(websocket)
 
 
 # Global broadcaster instance

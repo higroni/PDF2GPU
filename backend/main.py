@@ -86,6 +86,42 @@ async def startup_event():
         logger.error(f"Failed to initialize database: {e}")
         raise
     
+    # Cleanup orphaned evaluations (running status but no active process)
+    try:
+        from backend.database import SessionLocal
+        from backend.models.evaluation import Evaluation
+        from datetime import datetime
+        
+        db = SessionLocal()
+        try:
+            orphaned = db.query(Evaluation).filter(
+                Evaluation.status == "running"
+            ).all()
+            
+            if orphaned:
+                logger.warning(f"Found {len(orphaned)} orphaned evaluations, resetting to 'failed'")
+                for eval in orphaned:
+                    eval.status = "failed"
+                    eval.completed_at = datetime.utcnow()
+                    logger.info(f"Reset evaluation {eval.id} ('{eval.name}') from 'running' to 'failed'")
+                
+                db.commit()
+                logger.info(f"Successfully reset {len(orphaned)} orphaned evaluations")
+            else:
+                logger.info("No orphaned evaluations found")
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error(f"Failed to cleanup orphaned evaluations: {e}")
+    
+    # Clear in-memory cancellation flags
+    try:
+        from backend.services.evaluation_service import _cancelled_evaluations
+        _cancelled_evaluations.clear()
+        logger.info("Cleared in-memory cancellation flags")
+    except Exception as e:
+        logger.warning(f"Failed to clear cancellation flags: {e}")
+    
     # Initialize log broadcaster for evaluation service
     try:
         from backend.routers.evaluation_logs import log_broadcaster

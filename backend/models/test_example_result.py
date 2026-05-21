@@ -31,6 +31,13 @@ class TestExampleResult(Base):
     exact_match = Column(Integer, nullable=False, default=0)  # 0 ili 1 (boolean kao int)
     word_overlap = Column(Float, nullable=True)
     
+    # Legal-specific metrics (for Serbian legal documents)
+    legal_term_precision = Column(Float, nullable=True)  # Precision of legal term usage
+    legal_term_recall = Column(Float, nullable=True)     # Recall of legal term usage
+    legal_term_f1 = Column(Float, nullable=True)         # F1 score for legal terms
+    citation_accuracy = Column(Float, nullable=True)     # Accuracy of law article citations
+    completeness_score = Column(Float, nullable=True)    # Completeness of answer (0-1)
+    
     # Performance breakdown (per pipeline phase)
     query_processing_ms = Column(Float, nullable=True)
     search_ms = Column(Float, nullable=True)

@@ -16,6 +16,11 @@ from backend.models.test_example import TestExample
 from backend.models.test_example_result import TestExampleResult
 from backend.services.chat_service import ChatService
 from backend.utils.metrics import calculate_all_metrics, calculate_exact_match, calculate_word_overlap
+from backend.rag.legal_metrics import (
+    calculate_legal_term_accuracy,
+    calculate_citation_accuracy,
+    calculate_completeness_score
+)
 
 logger = logging.getLogger(__name__)
 
@@ -164,7 +169,7 @@ class EvaluationService:
                     return evaluation
                 
                 try:
-                    await broadcast_log(evaluation_id, "INFO", f"Evaluacija primera {i}/{len(test_examples)}: {test_example.question[:50]}...")
+                    await broadcast_log(evaluation_id, "INFO", f"Evaluacija primera {i}/{len(test_examples)}: {test_example.question}")
                     
                     result = await self._evaluate_single_example(
                         evaluation_id=evaluation_id,
@@ -172,6 +177,10 @@ class EvaluationService:
                         collection_id=collection_id
                     )
                     results.append(result)
+                    
+                    # Log generisanog odgovora (povećan limit na 500 karaktera)
+                    answer_preview = result.generated_answer[:500] + "..." if len(result.generated_answer) > 500 else result.generated_answer
+                    await broadcast_log(evaluation_id, "INFO", f"Generisani odgovor: {answer_preview}")
                     
                     # Ažuriraj completed_examples nakon svakog primera
                     evaluation.completed_examples = i
@@ -235,7 +244,7 @@ class EvaluationService:
         Returns:
             Rezultat evaluacije
         """
-        logger.info(f"Evaluating test example {test_example.id}: {test_example.question[:50]}...")
+        logger.info(f"Evaluating test example {test_example.id}: {test_example.question}")
         
         # Generiši odgovor koristeći ChatService sa performance metrikama
         result_data = await self.chat_service.generate_answer(
@@ -266,6 +275,26 @@ class EvaluationService:
             hypothesis=generated_answer
         )
         
+        # Calculate legal-specific metrics
+        try:
+            legal_term_metrics = calculate_legal_term_accuracy(
+                generated_answer,
+                test_example.expected_answer
+            )
+            citation_acc = calculate_citation_accuracy(
+                generated_answer,
+                test_example.expected_answer
+            )
+            completeness = calculate_completeness_score(
+                generated_answer,
+                test_example.expected_answer
+            )
+        except Exception as e:
+            logger.warning(f"Failed to calculate legal metrics: {e}")
+            legal_term_metrics = {"precision": None, "recall": None, "f1": None}
+            citation_acc = None
+            completeness = None
+        
         # Kreiraj rezultat sa performance metrikama
         result = TestExampleResult(
             evaluation_id=evaluation_id,
@@ -280,6 +309,11 @@ class EvaluationService:
             bert_score_f1=metrics.get('bert_score_f1'),
             exact_match=1 if exact_match else 0,
             word_overlap=word_overlap,
+            legal_term_precision=legal_term_metrics.get("precision"),
+            legal_term_recall=legal_term_metrics.get("recall"),
+            legal_term_f1=legal_term_metrics.get("f1"),
+            citation_accuracy=citation_acc,
+            completeness_score=completeness,
             query_processing_ms=perf_metrics.get('query_processing_ms'),
             search_ms=perf_metrics.get('search_ms'),
             reranking_ms=perf_metrics.get('reranking_ms'),

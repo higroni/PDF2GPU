@@ -11,12 +11,29 @@ from backend.config import settings
 
 logger = logging.getLogger(__name__)
 
-# Create engine
+# Create engine with WAL mode and proper connection handling
 engine = create_engine(
     settings.DATABASE_URL,
-    connect_args={"check_same_thread": False},  # Potrebno za SQLite
+    connect_args={
+        "check_same_thread": False,  # Potrebno za SQLite
+        "timeout": 30,  # Timeout za database lock (30 sekundi)
+    },
+    pool_pre_ping=True,  # Proveri konekciju pre korišćenja
+    pool_recycle=3600,  # Recycle konekcije nakon 1h
     echo=settings.DEBUG
 )
+
+# Enable WAL mode for better concurrency
+from sqlalchemy import event
+
+@event.listens_for(engine, "connect")
+def set_sqlite_pragma(dbapi_conn, connection_record):
+    """Set SQLite pragmas for better concurrency and crash recovery"""
+    cursor = dbapi_conn.cursor()
+    cursor.execute("PRAGMA journal_mode=WAL")  # Write-Ahead Logging
+    cursor.execute("PRAGMA synchronous=NORMAL")  # Faster writes, still safe
+    cursor.execute("PRAGMA busy_timeout=30000")  # 30 second timeout
+    cursor.close()
 
 # Session factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

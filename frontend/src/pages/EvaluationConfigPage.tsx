@@ -47,6 +47,7 @@ interface RAGConfig {
   query_processing: {
     use_transliteration: boolean;
     use_spell_check: boolean;
+    use_lemmatization: boolean;
   };
   search: {
     top_k: number;
@@ -113,7 +114,8 @@ const EvaluationConfigPage: React.FC = () => {
     },
     query_processing: {
       use_transliteration: true,
-      use_spell_check: true
+      use_spell_check: true,
+      use_lemmatization: false
     },
     search: {
       top_k: 10,             // Default from backend/config.py
@@ -434,6 +436,13 @@ const EvaluationConfigPage: React.FC = () => {
                 type: 'checkbox',
                 value: config.query_processing.use_spell_check,
                 tooltip: 'Enable spell checking for queries'
+              },
+              {
+                name: 'use_lemmatization',
+                label: 'Use Lemmatization',
+                type: 'checkbox',
+                value: config.query_processing.use_lemmatization,
+                tooltip: 'Normalize Serbian words to base form (e.g., "obveznika" → "obveznik")'
               }
             ]}
             onChange={(param, value) => handleConfigChange('query_processing', param, value)}

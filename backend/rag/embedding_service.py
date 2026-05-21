@@ -44,7 +44,22 @@ class EmbeddingService:
         logger.info(f"Ucitavam embedding model: {model_name}")
         logger.info(f"Device: {self.device}")
         
-        self.model = SentenceTransformer(model_name, device=self.device)
+        try:
+            # Pokušaj da učitaš model sa trust_remote_code
+            self.model = SentenceTransformer(
+                model_name,
+                device=self.device,
+                trust_remote_code=True
+            )
+        except Exception as e:
+            logger.warning(f"Failed to load model on {self.device}: {e}")
+            logger.info("Falling back to CPU...")
+            self.device = "cpu"
+            self.model = SentenceTransformer(
+                model_name,
+                device="cpu",
+                trust_remote_code=True
+            )
         
         # Dobij dimenzionalnost embeddings-a
         self.embedding_dim = self.model.get_sentence_embedding_dimension()

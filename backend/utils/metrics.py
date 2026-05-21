@@ -128,13 +128,16 @@ def calculate_bert_score(reference: str, hypothesis: str, lang: str = "en") -> D
     try:
         from bert_score import score  # type: ignore
         
-        # Računaj BERTScore
+        # Use CUDA if available, otherwise CPU
+        device = 'cuda' if _is_cuda_available() else 'cpu'
+        
+        # Računaj BERTScore - will raise error if GPU fails
         P, R, F1 = score(
             [hypothesis],
             [reference],
             lang=lang,
             verbose=False,
-            device='cuda' if _is_cuda_available() else 'cpu'
+            device=device
         )
         
         return {
@@ -148,6 +151,7 @@ def calculate_bert_score(reference: str, hypothesis: str, lang: str = "en") -> D
         return {'precision': 0.0, 'recall': 0.0, 'f1': 0.0}
     except Exception as e:
         logger.error(f"Error calculating BERTScore: {e}")
+        raise  # Re-raise the error to stop execution
         return {'precision': 0.0, 'recall': 0.0, 'f1': 0.0}
 
 
